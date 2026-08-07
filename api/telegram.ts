@@ -45,6 +45,39 @@ async function livePrice(ticker: string): Promise<number | null> {
   }
 }
 
+/** Secret-protected self-diagnostic: verifies the function's own credentials. */
+export async function GET(request: Request): Promise<Response> {
+  const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
+  if (!secret || request.headers.get("x-telegram-bot-api-secret-token") !== secret) {
+    return new Response("forbidden", { status: 403 });
+  }
+  const diag: Record<string, unknown> = {
+    tokenSet: Boolean(process.env.TELEGRAM_BOT_TOKEN),
+    dbSet: Boolean(process.env.DATABASE_URL),
+  };
+  if (process.env.TELEGRAM_BOT_TOKEN) {
+    try {
+      const res = await fetch(api("getMe"));
+      const data = (await res.json()) as { ok: boolean; description?: string; result?: { username?: string } };
+      diag.getMe = data.ok ? `ok @${data.result?.username}` : `FAIL: ${data.description}`;
+    } catch (err) {
+      diag.getMe = `THREW: ${(err as Error).message}`;
+    }
+  }
+  if (process.env.DATABASE_URL) {
+    const sql = postgres(process.env.DATABASE_URL, { max: 1, connect_timeout: 15, onnotice: () => {} });
+    try {
+      const [row] = await sql<{ n: string }[]>`SELECT count(*)::text AS n FROM cards`;
+      diag.cards = row?.n;
+    } catch (err) {
+      diag.cards = `FAIL: ${(err as Error).message}`;
+    } finally {
+      await sql.end();
+    }
+  }
+  return Response.json(diag);
+}
+
 export async function POST(request: Request): Promise<Response> {
   const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
   if (secret && request.headers.get("x-telegram-bot-api-secret-token") !== secret) {
