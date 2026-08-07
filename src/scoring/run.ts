@@ -81,6 +81,11 @@ async function main() {
 
     if (ageDays >= 365 && p.return1y === undefined) {
       p.return1y = round4((await returnSince(p.ticker, p.runDate)) ?? NaN) || null;
+      // Calibration (#4): realized price vs the fair value claimed a year ago.
+      if (p.return1y !== null && p.fairValue1y) {
+        const realized = p.refPrice * (1 + p.return1y);
+        p.valuationErrorPct = round4(((realized - p.fairValue1y) / p.fairValue1y) * 100);
+      }
       touched = true;
     }
     if (ageDays >= 1095 && p.return3y === undefined) {
@@ -114,11 +119,31 @@ async function main() {
     .filter((g) => g.status === "uncheckable").length;
   const gradedTotal = predictions.flatMap((p) => p.falsifierGrades ?? []).length;
 
+  // Calibration rollup (#4): systematic fair-value bias and band hit-rate,
+  // persisted so the digest can apply a measured correction once n is large.
+  const calibrated = predictions.filter((p) => p.valuationErrorPct != null);
+  let calibrationLine = "";
+  if (calibrated.length > 0) {
+    const meanErr = avg(calibrated.map((p) => p.valuationErrorPct!));
+    const inBand = calibrated.filter((p) => {
+      const realized = p.refPrice * (1 + (p.return1y ?? 0));
+      return p.implied1y?.bear != null && p.implied1y?.bull != null
+        ? realized >= p.implied1y.bear && realized <= p.implied1y.bull
+        : false;
+    }).length;
+    calibrationLine =
+      `valuation calibration (n=${calibrated.length}): realized ${meanErr > 0 ? "+" : ""}${meanErr.toFixed(0)}% vs fair on average; ` +
+      `${inBand}/${calibrated.length} landed inside the bear–bull band`;
+    const { writeState } = await import("../lib/state.js");
+    writeState("calibration", { n: calibrated.length, meanErrorPct: Math.round(meanErr * 10) / 10, updatedAt: today });
+  }
+
   const summary = [
     `<b>Scoring rollup — ${today}</b>`,
     `predictions tracked: ${predictions.length} | graded this run: ${graded}`,
     driftSummary || "drift: no predictions ≥30 days old yet",
     gradedTotal > 0 ? `falsifiers: ${gradedTotal} graded, ${uncheckableTotal} uncheckable (target <25%)` : "",
+    calibrationLine,
     `feedback: ${upRate}`,
     ...lines.slice(0, 10),
     "<i>Research queue, not investment advice.</i>",

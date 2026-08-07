@@ -32,6 +32,11 @@ export interface Prediction {
   scenarios: Verdict["scenarios"];
   /** Compact state snapshot — lets a later look diff the two states in code. */
   snapshot?: LookSnapshot;
+  /** Valuation at record time — calibration inputs (improvement #4). */
+  fairValue1y?: number | null;
+  implied1y?: { bear: number | null; base: number | null; bull: number | null };
+  /** Realized-vs-fair error at 1y, percent; filled by the scoring job. */
+  valuationErrorPct?: number | null;
   // Filled in by the scoring job as the prediction ages:
   drift30?: number | null; // return vs SPY, fraction
   drift90?: number | null;

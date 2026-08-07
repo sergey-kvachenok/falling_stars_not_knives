@@ -15,6 +15,7 @@ import { buildDigest, buildReportHtml, type DigestEntry } from "../deliver/repor
 import { drainFeedback, sendDigest, sendHeartbeat, sendReport, telegramConfigured } from "../deliver/telegram.js";
 import { appendPredictions, loadPredictions, type Prediction } from "../scoring/predictions.js";
 import { takeSnapshot } from "../compute/lookdiff.js";
+import { impliedPrice } from "../compute/anchors.js";
 import type { FeedbackEntry } from "../deliver/telegram.js";
 import { loadFeedbackDb, upsertCards } from "../lib/db.js";
 import { buildExpandedCard } from "../deliver/card.js";
@@ -316,6 +317,13 @@ async function main() {
       refPrice: byTicker.get(e.ticker)?.candidate.price ?? 0,
       scenarios: e.analysis.verdict!.scenarios,
       snapshot: takeSnapshot(e.bundle),
+      fairValue1y: e.fairValue ?? null,
+      implied1y: Object.fromEntries(
+        (["bear", "base", "bull"] as const).map((cs) => {
+          const s = e.analysis.verdict!.scenarios.find((x) => x.horizonYears === "1" && x.scenarioCase === cs);
+          return [cs, s ? impliedPrice(s.valuationAnchor, e.bundle.metrics) : null];
+        }),
+      ) as { bear: number | null; base: number | null; bull: number | null },
     }));
   appendPredictions(predictions);
   for (const e of digestEntries) {
