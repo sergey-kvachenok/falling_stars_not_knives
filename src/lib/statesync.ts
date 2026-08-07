@@ -17,18 +17,24 @@ const STATE_DIR = new URL("../../out/state", import.meta.url).pathname;
 function db() {
   const url = process.env.DATABASE_URL;
   if (!url) return null;
-  return postgres(url, { max: 1, connect_timeout: 20 });
+  return postgres(url, { max: 1, connect_timeout: 20, onnotice: () => {} });
+}
+
+type Sql = NonNullable<ReturnType<typeof db>>;
+
+async function ensureTable(sql: Sql): Promise<void> {
+  await sql`CREATE TABLE IF NOT EXISTS state_kv (
+    name text PRIMARY KEY,
+    value jsonb NOT NULL,
+    updated_at timestamptz NOT NULL DEFAULT now()
+  )`;
 }
 
 export async function pullState(): Promise<boolean> {
   const sql = db();
   if (!sql) return false;
   try {
-    await sql`CREATE TABLE IF NOT EXISTS state_kv (
-      name text PRIMARY KEY,
-      value jsonb NOT NULL,
-      updated_at timestamptz NOT NULL DEFAULT now()
-    )`;
+    await ensureTable(sql);
     const rows = await sql<{ name: string; value: unknown }[]>`SELECT name, value FROM state_kv`;
     mkdirSync(STATE_DIR, { recursive: true });
     for (const row of rows) {
@@ -46,6 +52,7 @@ export async function pushState(): Promise<boolean> {
   if (!sql) return false;
   try {
     if (!existsSync(STATE_DIR)) return true;
+    await ensureTable(sql);
     const files = readdirSync(STATE_DIR).filter((f) => f.endsWith(".json"));
     for (const f of files) {
       const name = f.replace(/\.json$/, "");
