@@ -17,6 +17,8 @@ concurrency:
 jobs:
   run:
     runs-on: ubuntu-latest
+    # Secrets live in the "prod" environment (repo → Settings → Environments).
+    environment: prod
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
