@@ -26,6 +26,7 @@ export interface TickerBundle {
     dayChangePct?: number;
     monthChangePct?: number | null;
     fromHighPct?: number;
+    analystTargetPrice?: number | null; // street consensus, shown for contrast only
     triggers?: string[];
   };
   documents: {

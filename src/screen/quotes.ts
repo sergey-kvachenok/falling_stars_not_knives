@@ -11,6 +11,7 @@ export interface QuoteLite {
   avgVolume: number;
   fiftyTwoWeekHigh: number;
   fiftyDayAverage: number | null;
+  analystTarget: number | null; // Wall Street consensus (targetMeanPrice)
   quoteType: string;
   market: string;
   currency: string;
@@ -53,6 +54,7 @@ export async function sweepQuotes(symbols: string[]): Promise<{ quotes: QuoteLit
         avgVolume: num(q.averageDailyVolume3Month),
         fiftyTwoWeekHigh: num(q.fiftyTwoWeekHigh),
         fiftyDayAverage: typeof q.fiftyDayAverage === "number" ? q.fiftyDayAverage : null,
+        analystTarget: typeof q.targetMeanPrice === "number" ? q.targetMeanPrice : null,
         quoteType: str(q.quoteType),
         market: str(q.market),
         currency: str(q.currency),

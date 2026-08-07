@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { impliedPrice, weightedAnchorPrice, type ValuationAnchor } from "./anchors.js";
+import { entryPrice, impliedPrice, weightedAnchorPrice, type ValuationAnchor } from "./anchors.js";
 import type { ComputedMetrics } from "./metrics.js";
 
 const metrics = (over: Partial<{ shares: number; netDebt: number }> = {}): ComputedMetrics =>
@@ -38,6 +38,12 @@ test("weighted anchor blends by narrative weight, skips unpriced scenarios", () 
   // (0.25×100 + 0.5×200) / 0.75 = 166.67
   assert.equal(weightedAnchorPrice(scenarios, m, "1"), 166.67);
   assert.equal(weightedAnchorPrice(scenarios, m, "3"), 990);
+});
+
+test("entry price discounts the estimate by the hurdle rate", () => {
+  assert.equal(entryPrice(115, 1, 0.15), 100); // 115 / 1.15
+  assert.equal(entryPrice(152.09, 3, 0.15), 100); // 152.09 / 1.15³
+  assert.equal(entryPrice(null, 1, 0.15), null);
 });
 
 test("negative equity value → null, missing shares → null, none → null", () => {

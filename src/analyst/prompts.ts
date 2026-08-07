@@ -29,7 +29,11 @@ const RULES = `RULES — read carefully:
 - Scenario weights are narrative weights, not calibrated probabilities.
 - Valuation anchors are ASSUMPTIONS, not prices: give the metric, the multiple, and the assumed
   absolute USD value of that metric in that scenario at that horizon (e.g. EBITDA 1200000000 —
-  full dollars, never millions). Code computes the implied price; never compute one yourself.`;
+  full dollars, never millions). Code computes the implied price; never compute one yourself.
+- Every scenario MUST carry a priceable anchor unless you set insufficient_evidence. Pick a
+  metric the company's financials can support: negative TTM earnings → never P/E (use EV/Sales
+  or P/S); negative EBITDA → never EV/EBITDA. metric "none" is only allowed with
+  insufficient_evidence.`;
 
 export interface PromptOpts {
   anonymize?: boolean;

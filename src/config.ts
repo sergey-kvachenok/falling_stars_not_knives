@@ -36,7 +36,12 @@ export const config = {
     maxCitationRetries: 2,
     maxOutputTokens: 8192,
     // Part of the bundle hash — bump on ANY prompt or schema change (PLAN.md §6.2).
-    promptVersion: 4,
+    promptVersion: 5,
+  },
+  valuation: {
+    // "Best entry" per scenario = estimated price discounted so the scenario
+    // returns at least this per year: entry = estimated / (1+r)^years.
+    entryHurdleRatePerYear: 0.15,
   },
   memory: {
     // 👎 names stay out of the digest this long unless a new filing appears.

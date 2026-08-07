@@ -13,6 +13,7 @@ export interface Candidate {
   dayChange: number;
   monthChange: number | null;
   fromHigh: number;
+  analystTarget: number | null;
   sector: string | null;
   triggers: TriggerName[];
 }
@@ -83,6 +84,7 @@ export async function screen(
       dayChange: q.dayChange,
       monthChange,
       fromHigh,
+      analystTarget: q.analystTarget,
       sector: null,
       triggers: hits.sort((a, b) => TRIGGER_RANK[a] - TRIGGER_RANK[b]),
     });

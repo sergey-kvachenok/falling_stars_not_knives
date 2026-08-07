@@ -67,6 +67,16 @@ export function weightedAnchorPrice(
   return weightSum > 0 ? Math.round((priceSum / weightSum) * 100) / 100 : null;
 }
 
+/**
+ * Best entry price for a scenario: the price today at which reaching the
+ * scenario's estimated price by its horizon returns ≥ hurdle per year.
+ */
+export function entryPrice(estimated: number | null, horizonYears: number, hurdlePerYear: number): number | null {
+  if (estimated === null || estimated <= 0) return null;
+  const entry = estimated / Math.pow(1 + hurdlePerYear, horizonYears);
+  return Math.round(entry * 100) / 100;
+}
+
 /** TTM actual for the anchor's metric — used to sanity-bound the assumption. */
 export function ttmActualFor(metric: AnchorMetric, m: ComputedMetrics): number | null {
   switch (metric) {

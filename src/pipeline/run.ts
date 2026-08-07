@@ -93,6 +93,7 @@ async function main() {
     try {
       const { bundle, skippedReason } = await buildBundle(c.ticker, c.cik, {
         price: c.price,
+        analystTargetPrice: c.analystTarget,
         dayChangePct: c.dayChange * 100,
         monthChangePct: c.monthChange === null ? null : c.monthChange * 100,
         fromHighPct: c.fromHigh * 100,

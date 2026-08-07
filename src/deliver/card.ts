@@ -1,4 +1,5 @@
-import { impliedPrice, weightedAnchorPrice } from "../compute/anchors.js";
+import { entryPrice, impliedPrice, weightedAnchorPrice } from "../compute/anchors.js";
+import { config } from "../config.js";
 import type { CardRow } from "../lib/db.js";
 import type { DigestEntry } from "./report.js";
 
@@ -25,35 +26,36 @@ export function buildExpandedCard(e: DigestEntry): CardRow {
   ];
 
   if (v) {
-    // 💰 Prices — anchors, never targets (PLAN.md §8).
-    const line = (h: "1" | "3") =>
-      ["bear", "base", "bull"]
-        .map((cs) => {
-          const s = v.scenarios.find((x) => x.horizonYears === h && x.scenarioCase === cs);
-          return `${cs} ${$(s ? impliedPrice(s.valuationAnchor, m) : null)}`;
-        })
-        .join(" / ");
+    // 💰 Fair value, street target, and the discount at analysis time.
+    // "Fair value" = the weight-blended scenario anchor — an estimate built
+    // from stated assumptions, not an advice-grade valuation.
+    const street = e.bundle.drop?.analystTargetPrice ?? null;
     const discount =
-      refPrice && weightedAnchor1y
-        ? ` · at analysis ($${refPrice.toFixed(2)}): ${pctVs(refPrice, weightedAnchor1y)} vs anchor`
-        : "";
+      refPrice && weightedAnchor1y ? ` (${pctVs(refPrice, weightedAnchor1y)} vs fair)` : "";
     parts.push(
-      `\n💰 <b>Anchors</b> <i>(assumption-implied, not price targets)</i>`,
-      `1y: ${line("1")}\n3y: ${line("3")}`,
-      `blended 1y anchor: ${$(weightedAnchor1y)}${discount}`,
+      `\n💰 <b>Valuation</b>`,
+      `AI fair value (blended 1y anchor): <b>${$(weightedAnchor1y)}</b>`,
+      `street analyst target: ${$(street)}`,
+      `price at analysis: ${$(refPrice)}${discount}`,
     );
 
-    // 🎯 Scenarios with per-scenario implied price + falsifier.
-    parts.push(`\n🎯 <b>Scenarios</b>`);
+    // 🎯 Scenarios: estimated price at horizon + best entry for the hurdle return.
+    const hurdle = config.valuation.entryHurdleRatePerYear;
+    parts.push(`\n🎯 <b>Scenarios</b> <i>(est. price at horizon → entry for ≥${Math.round(hurdle * 100)}%/yr)</i>`);
     for (const s of v.scenarios) {
       const p = impliedPrice(s.valuationAnchor, m);
+      const entry = entryPrice(p, Number(s.horizonYears), hurdle);
       const a = s.valuationAnchor;
       // Analyses cached before prompt v4 carry string anchors — skip the suffix.
       const anchorStr = a?.metric && a.metric !== "none" && a.multiple ? ` @ ${a.multiple}× ${esc(a.metric)}` : "";
       parts.push(
-        `${s.horizonYears}y ${s.scenarioCase} (${Math.round(s.narrativeWeight * 100)}%): ${$(p)}${anchorStr}\n` +
+        `${s.horizonYears}y ${s.scenarioCase} (${Math.round(s.narrativeWeight * 100)}%): est. ${$(p)}${anchorStr}` +
+          `${entry !== null ? ` → entry ≤ <b>${$(entry)}</b>` : ""}\n` +
           `   kill-switch: ${esc(cut(s.falsifier, 110))}`,
       );
+    }
+    if (v.insufficientEvidence) {
+      parts.push(`<i>insufficient evidence — scenario pricing has no filing basis; treat with extra suspicion</i>`);
     }
 
     // 🔍 Analysis — the analytical content as its own distinct section.

@@ -1,5 +1,5 @@
 import type { Classification, Verdict } from "./schemas.js";
-import { ttmActualFor } from "../compute/anchors.js";
+import { impliedPrice, ttmActualFor } from "../compute/anchors.js";
 import type { ComputedMetrics } from "../compute/metrics.js";
 
 // Citation validation (PLAN.md §7.5): the model has seen these tickers
@@ -50,6 +50,20 @@ export function validateVerdict(v: Verdict, valid: Set<string>, metrics?: Comput
       problems.push(`vague falsifier for ${s.horizonYears}y ${s.scenarioCase}: "${s.falsifier}"`);
     }
     const a = s.valuationAnchor;
+    // A card without numbers is useless: every scenario must price unless the
+    // verdict is insufficient_evidence (shares availability permitting).
+    const canPrice = metrics?.dilution.sharesOutstanding?.value;
+    if (!v.insufficientEvidence && canPrice) {
+      if (a.metric === "none") {
+        problems.push(
+          `scenario ${s.horizonYears}y ${s.scenarioCase} has metric "none" — pick a priceable metric (EV/Sales or P/S always works)`,
+        );
+      } else if (metrics && impliedPrice(a, metrics) === null) {
+        problems.push(
+          `anchor for ${s.horizonYears}y ${s.scenarioCase} does not price (${a.multiple}× ${a.metric}) — choose a metric the financials support`,
+        );
+      }
+    }
     if (a.metric !== "none") {
       if (a.multiple <= 0 || a.multiple > 500) {
         problems.push(`implausible multiple ${a.multiple} for ${s.horizonYears}y ${s.scenarioCase}`);
