@@ -32,10 +32,15 @@ export function buildExpandedCard(e: DigestEntry): CardRow {
     const street = e.bundle.drop?.analystTargetPrice ?? null;
     const discount =
       refPrice && weightedAnchor1y ? ` (${pctVs(refPrice, weightedAnchor1y)} vs fair)` : "";
+    const entryRec =
+      weightedAnchor1y !== null
+        ? Math.round(weightedAnchor1y * (1 - config.valuation.requiredDiscountToFair) * 100) / 100
+        : null;
     parts.push(
       `\n💰 <b>Valuation</b>`,
       `AI fair value (blended 1y anchor): <b>${$(weightedAnchor1y)}</b>`,
-      `street analyst target: ${$(street)}`,
+      `analyst consensus: ${$(street)}`,
+      `recommended entry price: ≤ <b>${$(entryRec)}</b>`,
       `price at analysis: ${$(refPrice)}${discount}`,
     );
 

@@ -18,6 +18,9 @@ import { takeSnapshot } from "../compute/lookdiff.js";
 import type { FeedbackEntry } from "../deliver/telegram.js";
 import { loadFeedbackDb, upsertCards } from "../lib/db.js";
 import { buildExpandedCard } from "../deliver/card.js";
+import { digestGate } from "../compute/quality.js";
+import { buildNewsHtml, fetchNews } from "../news/rss.js";
+import { sendNews } from "../deliver/telegram.js";
 
 // Nightly entrypoint (PLAN.md §3):
 //   screen → cooldown → enrich (with drop context) → analyze → rank → deliver.
@@ -81,7 +84,33 @@ async function main() {
   // Webhook mode writes votes to the feedback table; the table wins when present.
   const feedbackLog = (await loadFeedbackDb()) ?? readState<FeedbackEntry[]>("feedback", []);
   const lastVote = new Map<string, FeedbackEntry>();
-  for (const f of feedbackLog) lastVote.set(f.ticker, f); // append-order → latest wins
+  for (const f of feedbackLog) {
+    if (f.runDate !== "news") lastVote.set(f.ticker, f); // append-order → latest wins
+  }
+  const newsMuted = new Set(feedbackLog.filter((f) => f.runDate === "news").map((f) => f.ticker));
+  const titleByTicker = new Map(universe.map((u) => [u.ticker, u.title]));
+
+  // Daily news/rumors for 👍 companies, mute-aware — runs on every outcome,
+  // including empty-list days.
+  async function deliverNews(): Promise<void> {
+    const targets = [...lastVote.values()]
+      .filter(
+        (f) =>
+          f.worthMyTime &&
+          !newsMuted.has(f.ticker) &&
+          daysBetween(f.receivedAt.slice(0, 10), runDate) < config.memory.watchlistDays,
+      )
+      .map((f) => f.ticker)
+      .filter((t, i, arr) => arr.indexOf(t) === i)
+      .slice(0, config.news.maxCompaniesPerDay);
+    for (const t of targets) {
+      const items = await fetchNews(t, titleByTicker.get(t) ?? t).catch(() => []);
+      if (items.length === 0) continue;
+      const html = buildNewsHtml(t, titleByTicker.get(t) ?? t, items);
+      if (noTelegram) console.log(`[news ${t}] ${items.length} headline(s) (not sent)`);
+      else await sendNews(t, html).catch((err) => console.warn(`news ${t}: ${(err as Error).message}`));
+    }
+  }
   const allPreds = loadPredictions();
   const predByKey = new Map(allPreds.map((p) => [`${p.ticker}|${p.runDate}`, p]));
 
@@ -148,11 +177,23 @@ async function main() {
     `${entries.length} analyzed, ${cacheHits} cached | insufficient_evidence ${(insuffRate * 100).toFixed(0)}% | ` +
     `vote agreement ${(avgAgreement * 100).toFixed(0)}% | LLM ${usage.calls} calls ${usage.promptTokens + usage.outputTokens} tokens`;
 
-  // 4. Empty day → heartbeat (silence is ambiguous — trap #8).
-  if (entries.length === 0) {
-    const msg = `No candidates today (${runDate}). ${skipped.length > 0 ? `Skipped: ${skipped.length}.` : ""} Pipeline healthy.`;
-    if (noTelegram) console.log(`[heartbeat] ${msg}`);
+  // 4. Digest admission gate: healthy + ≥20% undervalued only. Exclusions
+  // are logged, never silent; an empty list beats a padded one.
+  const gated = entries.map((e) => ({ ...e, gate: digestGate(e.bundle, e.analysis.verdict) }));
+  const excluded = gated.filter((g) => !g.gate.pass);
+  for (const g of excluded) console.log(`gate excluded ${g.candidate.ticker}: ${g.gate.reasons.join("; ")}`);
+  const qualified = gated.filter((g) => g.gate.pass);
+
+  if (qualified.length === 0) {
+    const msg =
+      entries.length === 0
+        ? `No candidates today (${runDate}). ${skipped.length > 0 ? `Skipped: ${skipped.length}.` : ""} Pipeline healthy.`
+        : `<b>No qualifying companies today (${runDate}).</b>\nAnalyzed ${entries.length}; none passed the ` +
+          `health + ≥${config.valuation.requiredDiscountToFair * 100}%-undervaluation bar:\n` +
+          excluded.slice(0, 8).map((g) => `• ${g.candidate.ticker}: ${g.gate.reasons[0]}`).join("\n");
+    if (noTelegram) console.log(`[message]\n${msg.replace(/<[^>]+>/g, "")}`);
     else await sendHeartbeat(msg);
+    await deliverNews();
     saveRunSummary(runDate, entries.length, skipped, health, t0);
     await pushState();
     return;
@@ -188,10 +229,16 @@ async function main() {
     }
   }
 
-  // 5. Rank.
-  console.log("Ranking…");
-  const { ranking, stable } = await rankVerdicts(entries.map((e) => e.analysis));
-  const byTicker = new Map(entries.map((e) => [e.analysis.ticker, e]));
+  // 5. Rank the qualified names (one qualifier needs no ranking call).
+  console.log(`Ranking ${qualified.length} qualified name(s)…`);
+  let ranking: import("../analyst/schemas.js").Ranking;
+  let stable = true;
+  if (qualified.length === 1) {
+    ranking = { ranked: [{ ticker: qualified[0]!.analysis.ticker, justification: "only qualifier today" }], notes: "" };
+  } else {
+    ({ ranking, stable } = await rankVerdicts(qualified.map((q) => q.analysis)));
+  }
+  const byTicker = new Map(qualified.map((e) => [e.analysis.ticker, e]));
   const digestEntries: DigestEntry[] = ranking.ranked
     .map((r) => {
       const e = byTicker.get(r.ticker);
@@ -199,11 +246,26 @@ async function main() {
       const prior = allPreds.filter((p) => p.ticker === r.ticker && p.runDate < runDate).at(-1);
       const v = lastVote.get(r.ticker);
       const seenNote = prior ? `seen ${prior.runDate}${v ? (v.worthMyTime ? " 👍" : " 👎") : ""}` : undefined;
-      const entry: DigestEntry = { ticker: r.ticker, bundle: e.bundle, analysis: e.analysis, justification: r.justification };
+      const entry: DigestEntry = {
+        ticker: r.ticker,
+        bundle: e.bundle,
+        analysis: e.analysis,
+        justification: r.justification,
+        fairValue: e.gate.fairValue,
+        undervaluationPct: e.gate.undervaluationPct,
+      };
       if (seenNote) entry.seenNote = seenNote;
       return entry;
     })
     .filter((x): x is DigestEntry => x !== null);
+
+  // Street consensus for the digest lines (per-symbol module, ≤5 calls).
+  const { getAnalystTarget } = await import("../screen/quotes.js");
+  for (const e of digestEntries) {
+    if (e.bundle.drop && e.bundle.drop.analystTargetPrice == null) {
+      e.bundle.drop.analystTargetPrice = await getAnalystTarget(e.ticker);
+    }
+  }
 
   // 6. Deliver.
   const digest = buildDigest(digestEntries, runDate, stable, watchlist);
@@ -227,6 +289,7 @@ async function main() {
     await sendReport(`report-${runDate}.html`, report, `Full report — ${runDate}`);
     console.log("Digest + report sent.");
   }
+  await deliverNews();
 
   // 7. Persist predictions (PLAN.md §10 — recorded from day one), cooldown, run summary.
   const predictions: Prediction[] = digestEntries

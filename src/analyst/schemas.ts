@@ -44,6 +44,15 @@ export const VERDICT_SCHEMA = {
       type: "STRING",
       description: "What changed vs the most recent prior analysis (new filing, fired falsifier, reclassification); 'first look' when there is no prior",
     },
+    moat: {
+      type: "OBJECT",
+      description: "Durable competitive advantage, judged from the business economics visible in the bundle",
+      properties: {
+        assessment: { type: "STRING", enum: ["wide", "narrow", "none", "unclear"] },
+        rationale: { type: "STRING", description: "One sentence; ground in margins/pricing power/switching costs evident in the data" },
+      },
+      required: ["assessment", "rationale"],
+    },
     keyFacts: {
       type: "ARRAY",
       items: {
@@ -132,6 +141,7 @@ export const VERDICT_SCHEMA = {
     "dropCause",
     "oneLineThesis",
     "changeSincePrior",
+    "moat",
     "keyFacts",
     "managementLanguage",
     "guidanceRead",
@@ -146,6 +156,7 @@ export interface Verdict {
   dropCause: { primary: string; secondary: string; rationale: string; sources: string[] };
   oneLineThesis: string;
   changeSincePrior: string;
+  moat: { assessment: "wide" | "narrow" | "none" | "unclear"; rationale: string };
   keyFacts: { fact: string; source: string }[];
   managementLanguage: { observations: string[]; sources: string[] };
   guidanceRead: { change: string; timingVsDemand: string; evidence: string; source: string };

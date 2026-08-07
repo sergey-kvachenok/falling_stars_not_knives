@@ -46,6 +46,19 @@ export async function sendHeartbeat(text: string): Promise<void> {
   await call("sendMessage", { chat_id: config.telegram.chatId, text, parse_mode: "HTML" });
 }
 
+/** Per-company news message with a mute button (runDate sentinel "news"). */
+export async function sendNews(ticker: string, html: string): Promise<void> {
+  await call("sendMessage", {
+    chat_id: config.telegram.chatId,
+    text: html,
+    parse_mode: "HTML",
+    disable_web_page_preview: true,
+    reply_markup: {
+      inline_keyboard: [[{ text: `🔕 stop news for ${ticker}`, callback_data: `fb|news|${ticker}|0` }]],
+    },
+  });
+}
+
 /** Full report as an HTML file attachment — the digest links to nothing else. */
 export async function sendReport(filename: string, htmlContent: string, caption: string): Promise<void> {
   const form = new FormData();

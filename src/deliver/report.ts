@@ -2,6 +2,9 @@ import type { AnalysisRecord } from "../analyst/analyze.js";
 import type { TickerBundle } from "../bundle/build.js";
 import type { Ranking, Verdict } from "../analyst/schemas.js";
 import { impliedPrice } from "../compute/anchors.js";
+import { config } from "../config.js";
+
+const $p = (p: number | null): string => (p === null ? "—" : `$${p >= 100 ? p.toFixed(0) : p.toFixed(2)}`);
 
 // Digest + report builders (PLAN.md §9.1). Anomalies lead; summaries follow —
 // the reader's alert fatigue is the true failure mode. Every surface carries
@@ -16,6 +19,8 @@ export interface DigestEntry {
   analysis: AnalysisRecord;
   justification: string;
   seenNote?: string; // "seen 2026-08-07 👍" — bot memory marker
+  fairValue?: number | null; // blended 1y anchor, set by the digest gate
+  undervaluationPct?: number | null;
 }
 
 export interface WatchlistLine {
@@ -30,30 +35,38 @@ export function buildDigest(
   watchlist: WatchlistLine[] = [],
 ): string {
   const lines: string[] = [`<b>Post-drop research queue — ${runDate}</b>`];
+  const entryFactor = 1 - config.valuation.requiredDiscountToFair;
   entries.forEach((e, i) => {
     const v = e.analysis.verdict;
-    const c = e.analysis.classification;
     const drop = e.bundle.drop;
-    const dropStr = drop?.dayChangePct !== undefined && drop.dayChangePct <= -15
-      ? `${drop.dayChangePct.toFixed(0)}% day`
-      : drop?.monthChangePct
-        ? `${drop.monthChangePct.toFixed(0)}% month`
-        : drop?.fromHighPct !== undefined
-          ? `${drop.fromHighPct.toFixed(0)}% vs 52wk`
-          : "?";
-    const votes = c.voteAgreement < 1 ? ` ${Math.round(c.voteAgreement * 3)}/3` : "";
-    const anomaly = v && v.anomalies.length > 0 ? `\n   ⚡ ${esc(truncate(v.anomalies[0]!, 130))}` : "";
-    const degraded = e.bundle.sanity.confidence === "degraded" ? " ⚠metrics" : "";
-    const price = drop?.price ? ` $${drop.price.toFixed(2)}` : "";
-    const anchors = v ? anchorLine(v, e.bundle) : "";
+    const m = e.bundle.metrics;
+    const price = drop?.price ?? null;
+    const target = (h: "1" | "3") =>
+      ["bear", "base", "bull"]
+        .map((cs) => {
+          const s = v?.scenarios.find((x) => x.horizonYears === h && x.scenarioCase === cs);
+          return `${cs} ${$p(s && v ? impliedPrice(s.valuationAnchor, m) : null)}`;
+        })
+        .join(" / ");
+    const fair = e.fairValue ?? null;
+    const underv = e.undervaluationPct != null ? ` (undervalued ${e.undervaluationPct.toFixed(0)}%)` : "";
     const seen = e.seenNote ? ` · <i>${esc(e.seenNote)}</i>` : "";
+    const moat = v ? ` · moat: ${esc(v.moat.assessment)}` : "";
+    const anomaly = v && v.anomalies.length > 0 ? `\n⚡ ${esc(truncate(v.anomalies[0]!, 130))}` : "";
     const change =
       v && e.seenNote && v.changeSincePrior && !/^first look/i.test(v.changeSincePrior)
-        ? `\n   Δ ${esc(truncate(v.changeSincePrior, 130))}`
+        ? `\nΔ ${esc(truncate(v.changeSincePrior, 130))}`
         : "";
     lines.push(
-      `${i + 1}. <b>${esc(e.ticker)}</b>${price} ${dropStr} · ${esc(c.primary)}${votes}${degraded}${seen}` +
-        `${anchors}${change}${anomaly}\n   ${esc(truncate(v?.oneLineThesis ?? e.justification, 140))}`,
+      `${i + 1}. <b>${esc(e.ticker)}</b> — ${esc(truncate(e.bundle.company.name, 30))}${moat}${seen}\n` +
+        `current price: ${$p(price)}\n` +
+        `ai fair value: <b>${$p(fair)}</b>${underv}\n` +
+        `ai target 1y: ${target("1")}\n` +
+        `ai target 3y: ${target("3")}\n` +
+        `analyst consensus: ${$p(drop?.analystTargetPrice ?? null)}\n` +
+        `recommended entry price: ≤ <b>${$p(fair !== null ? Math.round(fair * entryFactor * 100) / 100 : null)}</b>` +
+        `${change}${anomaly}\n` +
+        `<i>${esc(truncate(v?.oneLineThesis ?? e.justification, 140))}</i>`,
     );
   });
   if (watchlist.length > 0) {

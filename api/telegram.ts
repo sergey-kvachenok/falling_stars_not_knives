@@ -105,6 +105,11 @@ export async function POST(request: Request): Promise<Response> {
       updated_at timestamptz NOT NULL DEFAULT now())`;
     await sql`INSERT INTO feedback (run_date, ticker, worth_my_time, received_at)
               VALUES (${runDate}, ${ticker}, ${up}, now())`;
+    // runDate sentinel "news" = mute button on a news message, not a vote.
+    if (runDate === "news") {
+      await tg("answerCallbackQuery", { callback_query_id: cq.id, text: `🔕 news muted for ${ticker}` });
+      return Response.json({ ok: true });
+    }
     await tg("answerCallbackQuery", {
       callback_query_id: cq.id,
       text: up ? `👍 ${ticker} recorded — details incoming` : `👎 ${ticker} recorded`,

@@ -106,6 +106,22 @@ export async function returnSince(symbol: string, sinceDate: string): Promise<nu
   }
 }
 
+/**
+ * Street consensus target — not in the batch quote payload; requires the
+ * per-symbol financialData module. Digest names only (≤10 calls/run).
+ */
+export async function getAnalystTarget(symbol: string): Promise<number | null> {
+  try {
+    const res = (await yf.quoteSummary(symbol, { modules: ["financialData"] }, { validateResult: false })) as {
+      financialData?: { targetMeanPrice?: number };
+    };
+    const t = res.financialData?.targetMeanPrice;
+    return typeof t === "number" && t > 0 ? t : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Sector lookup for the financials/REIT exclusion — survivors only, ≤ a few dozen calls. */
 export async function getSector(symbol: string): Promise<string | null> {
   try {

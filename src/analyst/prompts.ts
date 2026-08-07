@@ -33,7 +33,10 @@ const RULES = `RULES — read carefully:
 - Every scenario MUST carry a priceable anchor unless you set insufficient_evidence. Pick a
   metric the company's financials can support: negative TTM earnings → never P/E (use EV/Sales
   or P/S); negative EBITDA → never EV/EBITDA. metric "none" is only allowed with
-  insufficient_evidence.`;
+  insufficient_evidence.
+- Moat: judge the durability of the business from economics visible in the bundle — margin
+  levels and stability, pricing power, switching costs implied by the filings. Be stingy:
+  "wide" is rare; when the bundle gives no basis, say "unclear", never guess upward.`;
 
 export interface PromptOpts {
   anonymize?: boolean;

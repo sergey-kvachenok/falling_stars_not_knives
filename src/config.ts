@@ -36,12 +36,26 @@ export const config = {
     maxCitationRetries: 2,
     maxOutputTokens: 8192,
     // Part of the bundle hash — bump on ANY prompt or schema change (PLAN.md §6.2).
-    promptVersion: 5,
+    promptVersion: 6,
   },
   valuation: {
     // "Best entry" per scenario = estimated price discounted so the scenario
     // returns at least this per year: entry = estimated / (1+r)^years.
     entryHurdleRatePerYear: 0.15,
+    // A name enters the digest only if price ≤ (1 − this) × AI fair value.
+    // Also defines the recommended entry price: fair × (1 − this).
+    requiredDiscountToFair: 0.2,
+  },
+  quality: {
+    // Deterministic health gates — a name failing any is excluded (logged).
+    maxNetDebtToEbitda: 2.5, // ignored when net debt ≤ 0
+    requirePositiveFcfTtm: true,
+    acceptedMoats: ["wide", "narrow"], // LLM moat judgment; "none"/"unclear" excluded
+  },
+  news: {
+    maxCompaniesPerDay: 5,
+    headlinesPerCompany: 4,
+    freshHours: 48,
   },
   memory: {
     // 👎 names stay out of the digest this long unless a new filing appears.
@@ -50,7 +64,7 @@ export const config = {
     watchlistDays: 90,
     watchlistMaxPerRun: 5,
   },
-  output: { topN: 10, horizonsYears: [1, 3] },
+  output: { topN: 5, horizonsYears: [1, 3] },
   telegram: {
     botToken: process.env.TELEGRAM_BOT_TOKEN ?? "",
     chatId: process.env.TELEGRAM_CHAT_ID ?? "",

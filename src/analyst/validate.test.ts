@@ -31,6 +31,7 @@ const goodVerdict = (): Verdict => ({
   dropCause: { primary: "thesis_breaking", secondary: "none", rationale: "guidance cut", sources: ["0001-26-000001"] },
   oneLineThesis: "guidance cut on demand weakness",
   changeSincePrior: "first look",
+  moat: { assessment: "narrow" as const, rationale: "high switching costs evident in retention" },
   keyFacts: [{ fact: "revenue fell", source: "revenue" }],
   managementLanguage: { observations: ["hedging"], sources: ["0001-26-000001"] },
   guidanceRead: { change: "lowered", timingVsDemand: "demand", evidence: "we now expect…", source: "0001-26-000001" },
