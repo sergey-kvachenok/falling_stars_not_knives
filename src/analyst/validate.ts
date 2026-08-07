@@ -1,6 +1,7 @@
 import type { Classification, Verdict } from "./schemas.js";
 import { impliedPrice, ttmActualFor } from "../compute/anchors.js";
 import type { ComputedMetrics } from "../compute/metrics.js";
+import type { TickerBundle } from "../bundle/build.js";
 
 // Citation validation (PLAN.md §7.5): the model has seen these tickers
 // thousands of times in training and will import priors. Every cited source
@@ -24,7 +25,12 @@ export function validateClassification(c: Classification, valid: Set<string>): V
 
 const VAGUE_FALSIFIER = /sentiment|momentum|investor confidence|market recovers|stock (price )?(recovers|rebounds)/i;
 
-export function validateVerdict(v: Verdict, valid: Set<string>, metrics?: ComputedMetrics): ValidationResult {
+export function validateVerdict(
+  v: Verdict,
+  valid: Set<string>,
+  metrics?: ComputedMetrics,
+  drop?: TickerBundle["drop"],
+): ValidationResult {
   const cited: string[] = [
     ...v.dropCause.sources,
     ...v.keyFacts.map((f) => f.source),
@@ -78,6 +84,26 @@ export function validateVerdict(v: Verdict, valid: Set<string>, metrics?: Comput
             `assumed ${a.metric} value ${a.assumedMetricValueUsd} is ${ratio.toFixed(1)}× the TTM actual (${actual}) for ${s.horizonYears}y ${s.scenarioCase} — check units (absolute USD, not millions)`,
           );
         }
+      }
+      // Empirical bound #1: the multiple must live near the company's own
+      // historical range when one exists.
+      const range = drop?.multipleRanges?.find((r) => r.metric === a.metric);
+      if (range && (a.multiple < range.p25 * 0.6 || a.multiple > range.p75 * 1.6)) {
+        problems.push(
+          `multiple ${a.multiple}× ${a.metric} for ${s.horizonYears}y ${s.scenarioCase} is far outside the historical range (p25 ${range.p25} – p75 ${range.p75}) — stay inside it or pick a different metric`,
+        );
+      }
+      // Empirical bound #2: 1y sales assumptions must stay near street consensus.
+      const street = drop?.streetRevenue1yUsd;
+      if (
+        street &&
+        s.horizonYears === "1" &&
+        (a.metric === "EV/Sales" || a.metric === "P/S") &&
+        (a.assumedMetricValueUsd < street * 0.6 || a.assumedMetricValueUsd > street * 1.4)
+      ) {
+        problems.push(
+          `1y assumed revenue ${a.assumedMetricValueUsd} strays >40% from street consensus (${street}) for ${s.scenarioCase} — align with it or argue against it with a tighter number`,
+        );
       }
     }
   }

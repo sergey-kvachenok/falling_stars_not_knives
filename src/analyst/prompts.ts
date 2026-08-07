@@ -36,7 +36,12 @@ const RULES = `RULES — read carefully:
   insufficient_evidence.
 - Moat: judge the durability of the business from economics visible in the bundle — margin
   levels and stability, pricing power, switching costs implied by the filings. Be stingy:
-  "wide" is rare; when the bundle gives no basis, say "unclear", never guess upward.`;
+  "wide" is rare; when the bundle gives no basis, say "unclear", never guess upward.
+- When HISTORICAL MULTIPLE RANGES are provided, choose multiples INSIDE them: bear near or
+  below p25, base near p50, bull near p75. Going outside the range requires the rationale to
+  say why the market's own history no longer applies.
+- When a STREET FORWARD ESTIMATE is provided, 1-year sales-based assumed values must engage
+  it: agree with it or explicitly argue against it in the rationale — never ignore it.`;
 
 export interface PromptOpts {
   anonymize?: boolean;
@@ -47,6 +52,19 @@ export interface PromptOpts {
 export function buildAnalystPrompt(bundle: TickerBundle, opts: PromptOpts = {}): PromptBundle {
   const validSources = collectValidSources(bundle, opts.history);
   const name = opts.anonymize ? "Company A" : `${bundle.ticker} (${bundle.company.name})`;
+
+  const ranges = bundle.drop?.multipleRanges ?? [];
+  const rangesSection =
+    ranges.length > 0
+      ? `\nHISTORICAL MULTIPLE RANGES (computed from this company's own trading history; current
+shares/net debt approximation):\n${ranges
+          .map((r) => `  - ${r.metric}: p25 ${r.p25} / median ${r.p50} / p75 ${r.p75} (n=${r.n} quarter-ends)`)
+          .join("\n")}\n`
+      : "";
+  const streetSection =
+    bundle.drop?.streetRevenue1yUsd != null
+      ? `STREET FORWARD ESTIMATE: consensus next-FY revenue ≈ $${(bundle.drop.streetRevenue1yUsd / 1e9).toFixed(2)}B.\n`
+      : "";
 
   const dropDesc = bundle.drop
     ? `day ${fmtPct(bundle.drop.dayChangePct)}, month ${fmtPct(bundle.drop.monthChangePct)}, ` +
@@ -102,7 +120,7 @@ ${RULES}
 
 COMPANY: ${name} — SIC ${bundle.company.sicDescription}
 DROP CONTEXT: ${dropDesc}
-${no8k}${priorSection}
+${rangesSection}${streetSection}${no8k}${priorSection}
 CITABLE SOURCES (the only valid citation values):
 ${[...validSources].map((s) => `  - ${s}`).join("\n")}
 

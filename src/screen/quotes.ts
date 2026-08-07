@@ -106,6 +106,35 @@ export async function returnSince(symbol: string, sinceDate: string): Promise<nu
   }
 }
 
+/** ~5 years of monthly closes — input for historical multiple ranges. */
+export async function getMonthlyCloses(symbol: string): Promise<{ date: string; close: number }[]> {
+  try {
+    const period1 = new Date(Date.now() - 5 * 365 * 86_400_000);
+    const res = (await yf.chart(symbol, { period1, interval: "1mo" }, { validateResult: false })) as {
+      quotes?: { date?: string | Date; close: number | null }[];
+    };
+    return (res.quotes ?? [])
+      .filter((b): b is { date: string | Date; close: number } => typeof b.close === "number" && b.date != null)
+      .map((b) => ({ date: new Date(b.date).toISOString().slice(0, 10), close: b.close }));
+  } catch {
+    return [];
+  }
+}
+
+/** Street forward revenue consensus (next fiscal year) — anchor for assumed values. */
+export async function getForwardRevenue(symbol: string): Promise<number | null> {
+  try {
+    const res = (await yf.quoteSummary(symbol, { modules: ["earningsTrend"] }, { validateResult: false })) as {
+      earningsTrend?: { trend?: { period?: string; revenueEstimate?: { avg?: number } }[] };
+    };
+    const nextYear = res.earningsTrend?.trend?.find((t) => t.period === "+1y");
+    const avg = nextYear?.revenueEstimate?.avg;
+    return typeof avg === "number" && avg > 0 ? avg : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Street consensus target — not in the batch quote payload; requires the
  * per-symbol financialData module. Digest names only (≤10 calls/run).

@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node --import tsx --test src/edgar/companyfacts.test.ts src/compute/sanity.test.ts src/compute/anchors.test.ts src/compute/quality.test.ts src/analyst/validate.test.ts",
+    "test": "node --import tsx --test src/edgar/companyfacts.test.ts src/compute/sanity.test.ts src/compute/anchors.test.ts src/compute/quality.test.ts src/compute/multiples.test.ts src/analyst/validate.test.ts",
     "screen": "tsx src/screen/run.ts",
     "typecheck": "tsc --noEmit",
     "bundle": "tsx src/bundle/run.ts",

@@ -28,6 +28,10 @@ export interface TickerBundle {
     fromHighPct?: number;
     analystTargetPrice?: number | null; // street consensus, shown for contrast only
     triggers?: string[];
+    /** Company's own historical multiple percentiles — bounds the AI's multiples. */
+    multipleRanges?: import("../compute/multiples.js").MultipleRange[];
+    /** Street next-FY revenue consensus — anchors assumed values. */
+    streetRevenue1yUsd?: number | null;
   };
   documents: {
     /** Empty = no filing explains the drop window. That absence is itself a signal. */

@@ -132,6 +132,18 @@ async function main() {
         skipped.push(`${c.ticker} (${skippedReason})`);
         continue;
       }
+      // Empirical valuation anchors: the company's own multiple history and
+      // the street's forward revenue — both bound the AI's assumptions.
+      const { getMonthlyCloses, getForwardRevenue } = await import("../screen/quotes.js");
+      const [closes, streetRev] = await Promise.all([getMonthlyCloses(c.ticker), getForwardRevenue(c.ticker)]);
+      const { historicalMultipleRanges } = await import("../compute/multiples.js");
+      bundle.drop!.multipleRanges = historicalMultipleRanges(
+        closes,
+        bundle.metrics,
+        bundle.facts as Parameters<typeof historicalMultipleRanges>[2],
+      );
+      bundle.drop!.streetRevenue1yUsd = streetRev;
+
       const { record, cacheHit } = await analyzeWithCache(bundle);
       if (cacheHit) cacheHits++;
 

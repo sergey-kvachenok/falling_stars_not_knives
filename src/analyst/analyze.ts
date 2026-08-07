@@ -93,7 +93,7 @@ export async function deepAnalyze(
   let lastErrors: string[] = [];
   for (let attempt = 0; attempt <= config.llm.maxCitationRetries; attempt++) {
     const v = await generateJson<Verdict>(p, VERDICT_SCHEMA, { temperature: 0.4 });
-    const check = validateVerdict(v, validSources, bundle.metrics);
+    const check = validateVerdict(v, validSources, bundle.metrics, bundle.drop);
     if (check.ok) return { verdict: v, errors: [] };
     lastErrors = [...check.badSources.map((s) => `bad source: ${s}`), ...check.problems];
     p = prompt + "\n\n" + retryFeedback(check);
@@ -112,6 +112,14 @@ export async function analyzeBundle(
   const classification = await classifyWithVotes(bundle, opts);
   const history = opts.anonymize ? [] : (await import("./history.js")).getTickerHistory(bundle.ticker);
   const { verdict, errors } = await deepAnalyze(bundle, { ...opts, history });
+  if (verdict && !verdict.insufficientEvidence) {
+    // Median-of-three valuation numbers (compact re-samples; see valuation.ts).
+    try {
+      verdict.scenarios = await (await import("./valuation.js")).valuationEnsemble(bundle, verdict);
+    } catch (err) {
+      console.warn(`  valuation ensemble failed, keeping single draw: ${(err as Error).message}`);
+    }
+  }
   return {
     ticker: bundle.ticker,
     bundleHash: bundleHash(bundle),

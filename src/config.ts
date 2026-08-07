@@ -33,10 +33,11 @@ export const config = {
     // demands it (PLAN.md §7.6).
     model: "gemini-3.5-flash-lite",
     classificationVotes: 3,
+    valuationSamples: 3, // median-merged scenario numbers (deep pass = sample 1)
     maxCitationRetries: 2,
     maxOutputTokens: 8192,
     // Part of the bundle hash — bump on ANY prompt or schema change (PLAN.md §6.2).
-    promptVersion: 6,
+    promptVersion: 7,
   },
   valuation: {
     // "Best entry" per scenario = estimated price discounted so the scenario

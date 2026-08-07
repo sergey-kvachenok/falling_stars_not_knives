@@ -35,7 +35,9 @@ export function digestGate(bundle: TickerBundle, verdict: Verdict | null): GateR
     undervaluationPct = Math.round(((fairValue - price) / fairValue) * 1000) / 10;
     if (price > fairValue * (1 - config.valuation.requiredDiscountToFair)) {
       reasons.push(
-        `only ${undervaluationPct}% below fair value (need ≥ ${config.valuation.requiredDiscountToFair * 100}%)`,
+        undervaluationPct < 0
+          ? `price ${Math.abs(undervaluationPct)}% ABOVE fair value`
+          : `only ${undervaluationPct}% below fair value (need ≥ ${config.valuation.requiredDiscountToFair * 100}%)`,
       );
     }
   }
