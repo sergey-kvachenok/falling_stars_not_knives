@@ -19,11 +19,17 @@ interface TgCallbackQuery {
 const api = (method: string) => `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/${method}`;
 
 async function tg(method: string, body: object): Promise<void> {
-  await fetch(api(method), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  }).catch(() => {});
+  try {
+    const res = await fetch(api(method), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = (await res.json()) as { ok: boolean; description?: string };
+    if (!data.ok) console.error(`telegram ${method} failed: ${data.description}`);
+  } catch (err) {
+    console.error(`telegram ${method} threw: ${(err as Error).message}`);
+  }
 }
 
 async function livePrice(ticker: string): Promise<number | null> {
