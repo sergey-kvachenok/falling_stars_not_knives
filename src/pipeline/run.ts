@@ -16,6 +16,8 @@ import { drainFeedback, sendDigest, sendHeartbeat, sendReport, telegramConfigure
 import { appendPredictions, loadPredictions, type Prediction } from "../scoring/predictions.js";
 import { takeSnapshot } from "../compute/lookdiff.js";
 import type { FeedbackEntry } from "../deliver/telegram.js";
+import { loadFeedbackDb, upsertCards } from "../lib/db.js";
+import { buildExpandedCard } from "../deliver/card.js";
 
 // Nightly entrypoint (PLAN.md §3):
 //   screen → cooldown → enrich (with drop context) → analyze → rank → deliver.
@@ -76,7 +78,8 @@ async function main() {
   // bundle hash.
   const cooldown = readState<CooldownState>("cooldown", {});
   // Bot memory: the reader's last vote per ticker steers what re-surfaces.
-  const feedbackLog = readState<FeedbackEntry[]>("feedback", []);
+  // Webhook mode writes votes to the feedback table; the table wins when present.
+  const feedbackLog = (await loadFeedbackDb()) ?? readState<FeedbackEntry[]>("feedback", []);
   const lastVote = new Map<string, FeedbackEntry>();
   for (const f of feedbackLog) lastVote.set(f.ticker, f); // append-order → latest wins
   const allPreds = loadPredictions();
@@ -207,6 +210,13 @@ async function main() {
   const reportsDir = new URL("../../out/reports", import.meta.url).pathname;
   mkdirSync(reportsDir, { recursive: true });
   writeFileSync(`${reportsDir}/report-${runDate}.html`, report);
+
+  // Precompute expanded cards so the webhook can answer a 👍 instantly.
+  const cardsStored = await upsertCards(digestEntries.map(buildExpandedCard)).catch((err) => {
+    console.warn(`card upsert failed: ${(err as Error).message}`);
+    return false;
+  });
+  if (cardsStored) console.log(`${digestEntries.length} expanded card(s) stored.`);
 
   if (noTelegram) {
     console.log("\n--- digest (not sent) ---\n" + digest + "\n--- end digest ---");

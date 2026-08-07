@@ -10,7 +10,8 @@
     "bundle": "tsx src/bundle/run.ts",
     "analyze": "tsx src/analyst/run.ts",
     "pipeline": "tsx src/pipeline/run.ts",
-    "score": "tsx src/scoring/run.ts"
+    "score": "tsx src/scoring/run.ts",
+    "webhook": "tsx src/deliver/webhook-setup.ts"
   },
   "keywords": [],
   "author": "",

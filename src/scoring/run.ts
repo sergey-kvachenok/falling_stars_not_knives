@@ -103,7 +103,8 @@ async function main() {
     .map(([cls, ds]) => `${cls}: ${(avg(ds) * 100).toFixed(1)}% avg drift vs SPY (n=${ds.length})`)
     .join("\n");
 
-  const feedback = readState<FeedbackEntry[]>("feedback", []);
+  const { loadFeedbackDb } = await import("../lib/db.js");
+  const feedback = (await loadFeedbackDb().catch(() => null)) ?? readState<FeedbackEntry[]>("feedback", []);
   const upRate = feedback.length
     ? `${Math.round((feedback.filter((f) => f.worthMyTime).length / feedback.length) * 100)}% 👍 of ${feedback.length} taps`
     : "no feedback taps yet";

@@ -76,7 +76,15 @@ interface TgUpdate {
  */
 export async function drainFeedback(): Promise<FeedbackEntry[]> {
   const { offset } = readState("telegram-offset", { offset: 0 });
-  const updates = await call<TgUpdate[]>("getUpdates", { offset, timeout: 0, allowed_updates: ["callback_query"] });
+  let updates: TgUpdate[];
+  try {
+    updates = await call<TgUpdate[]>("getUpdates", { offset, timeout: 0, allowed_updates: ["callback_query"] });
+  } catch (err) {
+    // A registered webhook makes getUpdates 409 — the webhook collects
+    // feedback now, so polling has nothing to do.
+    if ((err as Error).message.includes("webhook is active")) return [];
+    throw err;
+  }
   const entries: FeedbackEntry[] = [];
   let maxId = offset - 1;
   for (const u of updates) {
@@ -95,6 +103,9 @@ export async function drainFeedback(): Promise<FeedbackEntry[]> {
   if (entries.length > 0) {
     const log = readState<FeedbackEntry[]>("feedback", []);
     writeState("feedback", [...log, ...entries]);
+    // Mirror into the feedback table so polling and webhook modes share one ledger.
+    const { insertFeedbackDb } = await import("../lib/db.js");
+    await insertFeedbackDb(entries).catch(() => {});
   }
   return entries;
 }

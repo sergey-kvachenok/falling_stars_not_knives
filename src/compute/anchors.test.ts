@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { impliedPrice, type ValuationAnchor } from "./anchors.js";
+import { impliedPrice, weightedAnchorPrice, type ValuationAnchor } from "./anchors.js";
 import type { ComputedMetrics } from "./metrics.js";
 
 const metrics = (over: Partial<{ shares: number; netDebt: number }> = {}): ComputedMetrics =>
@@ -25,6 +25,19 @@ test("EV/EBITDA subtracts net debt", () => {
 test("P/E ignores net debt", () => {
   // 20 × 500M earnings = 10B / 100M shares = $100
   assert.equal(impliedPrice(anchor("P/E", 20, 500_000_000), metrics()), 100);
+});
+
+test("weighted anchor blends by narrative weight, skips unpriced scenarios", () => {
+  const m = metrics({ netDebt: 0 });
+  const scenarios = [
+    { horizonYears: "1", narrativeWeight: 0.25, valuationAnchor: anchor("P/E", 10, 1_000_000_000) }, // $100
+    { horizonYears: "1", narrativeWeight: 0.5, valuationAnchor: anchor("P/E", 20, 1_000_000_000) }, // $200
+    { horizonYears: "1", narrativeWeight: 0.25, valuationAnchor: anchor("none", 0, 0) }, // unpriced
+    { horizonYears: "3", narrativeWeight: 1, valuationAnchor: anchor("P/E", 99, 1_000_000_000) }, // other horizon
+  ];
+  // (0.25×100 + 0.5×200) / 0.75 = 166.67
+  assert.equal(weightedAnchorPrice(scenarios, m, "1"), 166.67);
+  assert.equal(weightedAnchorPrice(scenarios, m, "3"), 990);
 });
 
 test("negative equity value → null, missing shares → null, none → null", () => {

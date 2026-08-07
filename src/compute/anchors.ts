@@ -45,6 +45,28 @@ export function impliedPrice(anchor: ValuationAnchor, m: ComputedMetrics): numbe
   return price > 0 ? Math.round(price * 100) / 100 : null;
 }
 
+/**
+ * Weight-blended implied price across one horizon's scenarios — the single
+ * "anchor value" the digest compares the live price against. Weights are the
+ * model's narrative weights, normalized over scenarios that priced.
+ */
+export function weightedAnchorPrice(
+  scenarios: { horizonYears: string; narrativeWeight: number; valuationAnchor: ValuationAnchor }[],
+  m: ComputedMetrics,
+  horizon: "1" | "3",
+): number | null {
+  let weightSum = 0;
+  let priceSum = 0;
+  for (const s of scenarios) {
+    if (s.horizonYears !== horizon) continue;
+    const p = impliedPrice(s.valuationAnchor, m);
+    if (p === null || s.narrativeWeight <= 0) continue;
+    weightSum += s.narrativeWeight;
+    priceSum += s.narrativeWeight * p;
+  }
+  return weightSum > 0 ? Math.round((priceSum / weightSum) * 100) / 100 : null;
+}
+
 /** TTM actual for the anchor's metric — used to sanity-bound the assumption. */
 export function ttmActualFor(metric: AnchorMetric, m: ComputedMetrics): number | null {
   switch (metric) {

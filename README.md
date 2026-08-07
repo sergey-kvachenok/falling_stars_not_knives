@@ -50,3 +50,21 @@ Phase 1 acceptance: run for 3–4 market days and eyeball the survivors (PLAN.md
 
 Note (trap #6): GitHub disables cron schedules on repos with no activity for 60 days —
 any commit or manual workflow run resets the clock.
+
+## Instant 👍 replies (Telegram webhook on Vercel)
+
+Tapping 👍 replies immediately with an expanded ticker card: anchor prices per scenario,
+the blended 1y anchor with the live price's discount/premium to it, falsifiers, and the
+analysis as its own section. Votes also count immediately instead of at the next run.
+
+Setup (once):
+1. vercel.com → New Project → import this GitHub repo (framework preset: **Other**; no build
+   command needed — only `api/telegram.ts` deploys as a function).
+2. Project → Settings → Environment Variables: `DATABASE_URL`, `TELEGRAM_BOT_TOKEN`,
+   `TELEGRAM_WEBHOOK_SECRET` (any long random string — also add it to local `.env`).
+3. Deploy, then register the webhook:
+   `npm run webhook -- https://<project>.vercel.app/api/telegram`
+   (`npm run webhook -- --delete` reverts to getUpdates polling.)
+
+With the webhook active, the nightly job's getUpdates drain politely no-ops (Telegram 409)
+and the feedback table becomes the single ledger both modes share.
