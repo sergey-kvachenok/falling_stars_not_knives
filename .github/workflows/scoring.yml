@@ -1,0 +1,51 @@
+name: weekly-scoring
+
+on:
+  schedule:
+    # Sundays 12:00 UTC — markets closed, quiet API traffic.
+    - cron: "0 12 * * 0"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  score:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Restore pipeline cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache
+            out/analyses
+            out/state
+          key: pipeline-scoring-${{ github.run_id }}
+          restore-keys: |
+            pipeline-
+
+      - run: npm ci
+
+      - name: Run scoring
+        env:
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npm run score
+
+      - name: Notify failure
+        if: failure()
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+            -d text="⚠ Scoring job failed — run ${{ github.run_id }}"

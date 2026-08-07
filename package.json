@@ -1,0 +1,28 @@
+{
+  "name": "stock-agent",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --import tsx --test src/edgar/companyfacts.test.ts src/compute/sanity.test.ts src/compute/anchors.test.ts src/analyst/validate.test.ts",
+    "screen": "tsx src/screen/run.ts",
+    "typecheck": "tsc --noEmit",
+    "bundle": "tsx src/bundle/run.ts",
+    "analyze": "tsx src/analyst/run.ts",
+    "pipeline": "tsx src/pipeline/run.ts",
+    "score": "tsx src/scoring/run.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "postgres": "^3.4.9",
+    "yahoo-finance2": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "tsx": "^4.23.10",
+    "typescript": "^7.0.2"
+  },
+  "type": "module"
+}
