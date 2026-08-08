@@ -112,6 +112,26 @@ export function validateVerdict(
       problems.push("reconciliation entry lacks a verbatim management quote");
     }
   }
+
+  // Cross-horizon coherence: the 1y and 3y paths must describe the same
+  // company. Metric-switching (EV/Sales at 1y, P/E on early earnings at 3y)
+  // produced a 3y base at a third of the 1y base — each plausible alone,
+  // nonsense together. Rule: implied(3y) ≥ 0.7 × implied(1y) per case;
+  // genuine decline stories must show up in BOTH horizons.
+  if (metrics && !v.insufficientEvidence) {
+    for (const cs of ["bear", "base", "bull"]) {
+      const s1 = v.scenarios.find((s) => s.horizonYears === "1" && s.scenarioCase === cs);
+      const s3 = v.scenarios.find((s) => s.horizonYears === "3" && s.scenarioCase === cs);
+      const p1 = s1 ? impliedPrice(s1.valuationAnchor, metrics) : null;
+      const p3 = s3 ? impliedPrice(s3.valuationAnchor, metrics) : null;
+      if (p1 !== null && p3 !== null && p3 < p1 * 0.7) {
+        problems.push(
+          `incoherent trajectory for "${cs}": 3y implies $${p3} but 1y implies $${p1} — the horizons must tell one story. ` +
+            `Use the same metric family across horizons, or if the business genuinely shrinks by year 3, lower the 1y value too.`,
+        );
+      }
+    }
+  }
   return { ok: badSources.length === 0 && problems.length === 0, badSources, problems };
 }
 

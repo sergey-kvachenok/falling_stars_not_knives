@@ -41,7 +41,11 @@ const RULES = `RULES — read carefully:
   below p25, base near p50, bull near p75. Going outside the range requires the rationale to
   say why the market's own history no longer applies.
 - When a STREET FORWARD ESTIMATE is provided, 1-year sales-based assumed values must engage
-  it: agree with it or explicitly argue against it in the rationale — never ignore it.`;
+  it: agree with it or explicitly argue against it in the rationale — never ignore it.
+- The 1y and 3y scenarios must describe ONE coherent trajectory per case: prefer the same
+  metric family at both horizons. Never value a low-margin growth company on sales at 1y and
+  then on early-stage earnings at 3y — that produces two different companies. A 3y value far
+  below the same case's 1y value is only valid if the 1y path already shows the decline.`;
 
 export interface PromptOpts {
   anonymize?: boolean;

@@ -74,6 +74,26 @@ test("reconciliation without a verbatim quote is rejected", () => {
   assert.ok(r.problems.some((p) => p.includes("verbatim")));
 });
 
+test("incoherent 1y-vs-3y trajectory is rejected when metrics allow pricing", () => {
+  const metrics = {
+    dilution: { sharesOutstanding: { value: 100_000_000, accn: "a" }, yoyChangePct: null },
+    balance: { netDebt: 0 },
+    ttm: { revenue: null, ebitda: null, netIncome: null, fcf: null },
+  } as unknown as import("../compute/metrics.js").ComputedMetrics;
+  const v = goodVerdict();
+  // 1y base: 20× on $1B = $200/share; 3y base: 4× on $1B = $40/share → incoherent
+  for (const s of v.scenarios) {
+    s.valuationAnchor = {
+      metric: "P/E",
+      multiple: s.horizonYears === "1" ? 20 : 4,
+      assumedMetricValueUsd: 1_000_000_000,
+      rationale: "test",
+    };
+  }
+  const r = validateVerdict(v, VALID, metrics);
+  assert.ok(r.problems.some((p) => p.includes("incoherent trajectory")), r.problems.join(";"));
+});
+
 test("classification without sources rejected unless insufficient_evidence", () => {
   const bad = validateClassification(
     { primary: "sentiment", secondary: "none", rationale: "vibes", sources: [] },
