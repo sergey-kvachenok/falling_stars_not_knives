@@ -145,10 +145,23 @@ drift vs SPY per drop-class at 30/90 days, and at 1 year the realized-vs-fair er
 
 The measured bias (mean/median error, per-classification breakdown) persists to the
 `calibration` state. **Once `calibration.minSamples` (20) predictions have matured, the
-correction activates automatically**: displayed fair values, recommended entries, and the
-digest gate itself all use `fair × (1 + meanError)`, clamped to ×0.5–×1.5, and every
-corrected number is labeled with the sample count. Until then the bias is reported but not
-applied — correcting from a handful of samples would be fitting noise.
+correction activates automatically**: `fair × (1 + meanError)`, clamped to ×0.5–×1.5,
+labeled with the sample count. **Per-classification scalars apply once a class has ≥10
+matured samples** — bias is rarely uniform across mechanical liquidations and sentiment
+crashes. Until activation the bias is reported, never applied.
+
+Three stability guards on the loop itself:
+- **Tighten-only gating**: the correction may LOWER the fair value the gate uses, never
+  raise it — a loosening correction would admit more borderline names, whose failures
+  would contract the correction, an oscillating over/under-filtering feedback loop.
+  Displays show the true correction in both directions.
+- **Fast regime guard**: 1-year price calibration lags a market regime by design;
+  kill-switches don't. When >30% of graded kill-switches fired (≥10 graded), the required
+  discount widens by 5pts immediately.
+- **Corporate actions enter the sample explicitly**: buyouts resolve at the offer price,
+  bankruptcies at $0, via `npm run resolve -- TICKER DATE PRICE` — silently dropping dead
+  tickers would delete every −100% and flatter the system. The Sunday rollup nags about
+  unresolved names.
 
 `npm run verify` prints the full ledger — every prediction, what was claimed, on what
 economics, and what actually happened — plus the current calibration status.

@@ -119,6 +119,21 @@ async function main() {
     .filter((g) => g.status === "uncheckable").length;
   const gradedTotal = predictions.flatMap((p) => p.falsifierGrades ?? []).length;
 
+  // Fast regime guard input: kill-switch fire rate among decided grades.
+  // Fires within 90 days, unlike the 1-year price calibration — the early
+  // warning that the current regime is harsher than the scenarios assume.
+  const decided = predictions
+    .flatMap((p) => p.falsifierGrades ?? [])
+    .filter((g) => g.status === "fired" || g.status === "survived");
+  if (decided.length > 0) {
+    const firedShare = decided.filter((g) => g.status === "fired").length / decided.length;
+    const { writeState: ws } = await import("../lib/state.js");
+    ws("fastguard", { firedShare: Math.round(firedShare * 1000) / 1000, n: decided.length, updatedAt: today });
+  }
+
+  // Unresolved corporate actions bias calibration upward if ignored — nag.
+  const unresolved = predictions.filter((p) => p.resolutionNote?.includes("manual")).length;
+
   // Calibration rollup (#4): systematic fair-value bias and band hit-rate,
   // persisted so the digest can apply a measured correction once n is large.
   const calibrated = predictions.filter((p) => p.valuationErrorPct != null);
@@ -158,6 +173,9 @@ async function main() {
     `predictions tracked: ${predictions.length} | graded this run: ${graded}`,
     driftSummary || "drift: no predictions ≥30 days old yet",
     gradedTotal > 0 ? `falsifiers: ${gradedTotal} graded, ${uncheckableTotal} uncheckable (target <25%)` : "",
+    unresolved > 0
+      ? `⚠ ${unresolved} prediction(s) need manual corporate-action resolution (npm run resolve) — unresolved names bias calibration upward`
+      : "",
     calibrationLine,
     `feedback: ${upRate}`,
     ...lines.slice(0, 10),

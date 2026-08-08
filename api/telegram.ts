@@ -88,8 +88,16 @@ export async function POST(request: Request): Promise<Response> {
   const cq = update.callback_query;
   if (!cq?.data?.startsWith("fb|")) return Response.json({ ok: true });
 
-  const [, runDate, ticker, vote] = cq.data.split("|");
-  if (!runDate || !ticker) return Response.json({ ok: true });
+  // Acknowledge Telegram immediately — a cold-starting Neon connection must
+  // not eat into the webhook response window. Real work runs post-response.
+  const { waitUntil } = await import("@vercel/functions");
+  waitUntil(processTap(cq).catch((err) => console.error("webhook background error:", (err as Error).message)));
+  return Response.json({ ok: true });
+}
+
+async function processTap(cq: TgCallbackQuery): Promise<void> {
+  const [, runDate, ticker, vote] = cq.data!.split("|");
+  if (!runDate || !ticker) return;
   const up = vote === "1";
   const chatId = cq.message?.chat?.id;
 
@@ -108,7 +116,7 @@ export async function POST(request: Request): Promise<Response> {
     // runDate sentinel "news" = mute button on a news message, not a vote.
     if (runDate === "news") {
       await tg("answerCallbackQuery", { callback_query_id: cq.id, text: `🔕 news muted for ${ticker}` });
-      return Response.json({ ok: true });
+      return;
     }
     await tg("answerCallbackQuery", {
       callback_query_id: cq.id,
@@ -142,5 +150,4 @@ export async function POST(request: Request): Promise<Response> {
   } finally {
     await sql.end();
   }
-  return Response.json({ ok: true });
 }

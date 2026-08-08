@@ -7,6 +7,11 @@ import { config } from "../config.js";
 
 const BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 const MAX_ATTEMPTS = 5;
+// Free-tier RPM insurance: a hard floor between calls means bursts of short
+// responses (classification votes) can never trip the rate limit and spawn
+// retry storms. Sequential callers barely notice — most calls take longer.
+const MIN_CALL_INTERVAL_MS = 4_000;
+let nextCallAt = 0;
 
 export interface GenerateOptions {
   temperature?: number;
@@ -44,6 +49,9 @@ export async function generateJson<T>(
   });
 
   for (let attempt = 1; ; attempt++) {
+    const wait = nextCallAt - Date.now();
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    nextCallAt = Date.now() + MIN_CALL_INTERVAL_MS;
     const res = await fetch(`${BASE}/${model}:generateContent`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": config.llm.apiKey },

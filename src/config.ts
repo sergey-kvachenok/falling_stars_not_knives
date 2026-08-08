@@ -67,6 +67,16 @@ export const config = {
     // Loop 3: measured fair-value bias starts correcting displayed/gated
     // values once this many predictions have matured to their 1y grading.
     minSamples: 20,
+    // Per-classification correction activates per class at this sample size;
+    // below it, the global scalar applies (bias is rarely uniform across
+    // mechanical liquidations vs sentiment crashes).
+    minSamplesPerClass: 10,
+    // Fast regime guard: when this share of graded kill-switches FIRED at
+    // 90 days, widen the required discount immediately — price-error
+    // calibration lags a full year, kill-switches don't.
+    fastGuardFiredShare: 0.3,
+    fastGuardExtraDiscount: 0.05,
+    fastGuardMinGraded: 10,
     // Safety clamp on the correction factor — a measured bias beyond ±50%
     // means something is broken, not that we should multiply by it.
     minAdjustFactor: 0.5,

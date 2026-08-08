@@ -12,12 +12,14 @@
     "pipeline": "tsx src/pipeline/run.ts",
     "score": "tsx src/scoring/run.ts",
     "webhook": "tsx src/deliver/webhook-setup.ts",
-    "verify": "tsx src/scoring/report.ts"
+    "verify": "tsx src/scoring/report.ts",
+    "resolve": "tsx src/scoring/resolve.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@vercel/functions": "^3.9.1",
     "postgres": "^3.4.9",
     "yahoo-finance2": "^4.0.0"
   },

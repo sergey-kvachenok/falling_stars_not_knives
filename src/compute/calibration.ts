@@ -25,15 +25,46 @@ export interface AdjustedFair {
   adjusted: number;
   active: boolean; // false = not enough matured samples yet; raw stands
   n: number;
+  scope: "class" | "global" | "none"; // which bias scalar applied
 }
 
-export function adjustFairValue(raw: number, cal: CalibrationState | null): AdjustedFair {
+export function adjustFairValue(
+  raw: number,
+  cal: CalibrationState | null,
+  classification?: string,
+): AdjustedFair {
   if (!cal || cal.n < config.calibration.minSamples) {
-    return { raw, adjusted: raw, active: false, n: cal?.n ?? 0 };
+    return { raw, adjusted: raw, active: false, n: cal?.n ?? 0, scope: "none" };
+  }
+  // Bias is rarely uniform across drop types — use the per-classification
+  // scalar when that class has enough matured samples, global otherwise.
+  let errorPct = cal.meanErrorPct;
+  let n = cal.n;
+  let scope: AdjustedFair["scope"] = "global";
+  const bucket = classification ? cal.byClassification?.[classification] : undefined;
+  if (bucket && bucket.n >= config.calibration.minSamplesPerClass) {
+    errorPct = bucket.meanErrorPct;
+    n = bucket.n;
+    scope = "class";
   }
   const factor = Math.min(
     config.calibration.maxAdjustFactor,
-    Math.max(config.calibration.minAdjustFactor, 1 + cal.meanErrorPct / 100),
+    Math.max(config.calibration.minAdjustFactor, 1 + errorPct / 100),
   );
-  return { raw, adjusted: Math.round(raw * factor * 100) / 100, active: true, n: cal.n };
+  return { raw, adjusted: Math.round(raw * factor * 100) / 100, active: true, n, scope };
+}
+
+export interface FastGuardState {
+  firedShare: number; // fired / (fired + survived) among graded falsifiers
+  n: number;
+  updatedAt: string;
+}
+
+/** Extra discount demanded when recent kill-switches are firing at a high rate. */
+export function fastGuardExtraDiscount(): number {
+  const g = readState<FastGuardState | null>("fastguard", null);
+  if (!g || g.n < config.calibration.fastGuardMinGraded) return 0;
+  return g.firedShare > config.calibration.fastGuardFiredShare
+    ? config.calibration.fastGuardExtraDiscount
+    : 0;
 }

@@ -1,5 +1,5 @@
 import { weightedAnchorPrice } from "./anchors.js";
-import { adjustFairValue, loadCalibration } from "./calibration.js";
+import { adjustFairValue, fastGuardExtraDiscount, loadCalibration } from "./calibration.js";
 import { config } from "../config.js";
 import type { TickerBundle } from "../bundle/build.js";
 import type { Verdict } from "../analyst/schemas.js";
@@ -38,10 +38,18 @@ export function digestGate(bundle: TickerBundle, verdict: Verdict | null): GateR
 
   const fairValue = weightedAnchorPrice(verdict.scenarios, m, "1");
   // Loop 3: once enough predictions matured, the measured bias corrects the
-  // fair value BEFORE gating — the system spends its own track record.
+  // fair value BEFORE gating — but TIGHTEN-ONLY: the correction may lower
+  // the gate's fair value, never raise it. A loosening correction would let
+  // more borderline names through, whose failures would then contract the
+  // correction — an oscillating over/under-filtering feedback loop. Displays
+  // show the true correction in both directions; the gate only gets stricter.
   const cal = loadCalibration();
-  const adj = fairValue !== null ? adjustFairValue(fairValue, cal) : null;
-  const effectiveFair = adj?.adjusted ?? fairValue;
+  const adj = fairValue !== null ? adjustFairValue(fairValue, cal, verdict.dropCause.primary) : null;
+  const effectiveFair =
+    adj && fairValue !== null ? Math.min(adj.active ? adj.adjusted : fairValue, fairValue) : fairValue;
+  // Fast regime guard: recent kill-switch fire rate widens the demanded
+  // discount immediately (1y price calibration lags a regime by design).
+  const requiredDiscount = config.valuation.requiredDiscountToFair + fastGuardExtraDiscount();
   let undervaluationPct: number | null = null;
   if (effectiveFair === null) {
     reasons.push("scenarios did not price — no fair value");
@@ -49,12 +57,18 @@ export function digestGate(bundle: TickerBundle, verdict: Verdict | null): GateR
     reasons.push("no current price");
   } else {
     undervaluationPct = Math.round(((effectiveFair - price) / effectiveFair) * 1000) / 10;
-    if (price > effectiveFair * (1 - config.valuation.requiredDiscountToFair)) {
-      const calNote = adj?.active ? " (calibration-adjusted)" : "";
+    if (price > effectiveFair * (1 - requiredDiscount)) {
+      const notes = [
+        adj?.active ? "calibration-adjusted" : "",
+        requiredDiscount > config.valuation.requiredDiscountToFair ? "regime guard active" : "",
+      ]
+        .filter(Boolean)
+        .join(", ");
+      const calNote = notes ? ` (${notes})` : "";
       reasons.push(
         undervaluationPct < 0
           ? `price ${Math.abs(undervaluationPct)}% ABOVE fair value${calNote}`
-          : `only ${undervaluationPct}% below fair value${calNote} (need ≥ ${config.valuation.requiredDiscountToFair * 100}%)`,
+          : `only ${undervaluationPct}% below fair value${calNote} (need ≥ ${Math.round(requiredDiscount * 100)}%)`,
       );
     }
   }
