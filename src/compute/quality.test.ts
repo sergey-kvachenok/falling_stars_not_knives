@@ -13,17 +13,33 @@ const scenario = (h: "1" | "3", c: string, weight: number, multiple: number) => 
   falsifier: "Q3 revenue growth below 3% year-over-year printed",
 });
 
-function bundle(over: { price?: number; netDebt?: number; fcf?: number; sanity?: "high" | "degraded" } = {}): TickerBundle {
+function bundle(
+  over: {
+    price?: number;
+    netDebt?: number;
+    nde?: number | null;
+    fcf?: number;
+    fcfMarginPct?: number | null;
+    sanity?: "high" | "degraded";
+    economics?: Record<string, unknown>;
+  } = {},
+): TickerBundle {
   return {
     ticker: "T",
     cik: 1,
     builtAt: "",
     company: { name: "T Co", sic: "1", sicDescription: "", isDomesticFiler: true },
-    drop: { price: over.price ?? 50 },
+    drop: {
+      price: over.price ?? 50,
+      ...(over.economics
+        ? { economics: over.economics as unknown as import("./economics.js").EconomicView }
+        : {}),
+    },
     documents: { recent8Ks: [], latestQuarterly: null },
     metrics: {
       dilution: { sharesOutstanding: { value: 100_000_000, accn: "a" }, yoyChangePct: null },
-      balance: { netDebt: over.netDebt ?? -100_000_000, netDebtToEbitdaTtm: null },
+      balance: { netDebt: over.netDebt ?? -100_000_000, netDebtToEbitdaTtm: over.nde ?? null },
+      margins: { fcfPct: over.fcfMarginPct != null ? { latestPct: over.fcfMarginPct } : null },
       ttm: { fcf: over.fcf ?? 500_000_000 },
     } as unknown as TickerBundle["metrics"],
     sanity: { confidence: over.sanity ?? "high", flags: [] },
@@ -66,6 +82,21 @@ test("only 10% undervalued fails the 20% bar", () => {
 test("negative free cash flow fails", () => {
   const g = digestGate(bundle({ fcf: -50_000_000 }), verdict());
   assert.ok(g.reasons.some((r) => r.includes("free cash flow")));
+});
+
+test("indebted cash-burner cannot sneak past the debt gate via negative EBITDA", () => {
+  // $500M net debt, negative EBITDA → nde is null by construction (metrics
+  // only compute the ratio when EBITDA > 0), so the low-debt gate must fail.
+  const g = digestGate(bundle({ netDebt: 500_000_000, nde: null }), verdict());
+  assert.ok(g.reasons.some((r) => r.includes("debt too high")), g.reasons.join(";"));
+});
+
+test("ROIC gate: negative-spread names fail, fat FCF margin bypasses (R&D-heavy compounders)", () => {
+  const eco = { roicPct: 5, discountRatePctUsed: 10 };
+  const fails = digestGate(bundle({ economics: eco, fcfMarginPct: 8 }), verdict());
+  assert.ok(fails.reasons.some((r) => r.includes("growth destroys value")), fails.reasons.join(";"));
+  const bypassed = digestGate(bundle({ economics: eco, fcfMarginPct: 22 }), verdict());
+  assert.ok(!bypassed.reasons.some((r) => r.includes("growth destroys value")), bypassed.reasons.join(";"));
 });
 
 test("fair value far above street target fails the winner's-curse guard", () => {

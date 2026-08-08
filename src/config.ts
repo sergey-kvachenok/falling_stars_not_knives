@@ -59,12 +59,19 @@ export const config = {
     // Digest requires the market to imply at least this much LESS growth than
     // the street expects (expectations gap), unless price sits below EPV.
     minExpectationsGapPts: 5,
+    // Last-resort proxy for unprofitable names with no bottom-line estimate:
+    // revenue growth × this. Blunt by design — EPS growth is always preferred.
+    unprofitableRevenueHaircut: 0.5,
   },
   quality: {
     // Deterministic health gates — a name failing any is excluded (logged).
-    maxNetDebtToEbitda: 2.5, // ignored when net debt ≤ 0
+    maxNetDebtToEbitda: 2.5, // ignored when net debt ≤ 0; ratio only exists when EBITDA > 0
     requirePositiveFcfTtm: true,
     acceptedMoats: ["wide", "narrow"], // LLM moat judgment; "none"/"unclear" excluded
+    // GAAP expenses R&D immediately, depressing ROIC for research-heavy
+    // compounders — an owner-FCF margin this high proves value creation
+    // regardless of what the GAAP ROIC formula says.
+    roicBypassFcfMarginPct: 15,
   },
   news: {
     maxCompaniesPerDay: 5,

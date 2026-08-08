@@ -81,9 +81,14 @@ export function digestGate(bundle: TickerBundle, verdict: Verdict | null): GateR
 
   // Value-creation test: growth funded below its cost of capital destroys
   // value — a cheap-looking compounder of negative spreads is a trap.
-  if (eco?.roicPct != null && eco.roicPct < eco.discountRatePctUsed) {
+  // Bypass: GAAP expenses R&D immediately, so research-heavy compounders show
+  // depressed ROIC; a fat owner-FCF margin (already after SBC) proves value
+  // creation regardless of the GAAP formula.
+  const fcfMarginPct = m.margins?.fcfPct?.latestPct ?? null;
+  const fcfBypass = fcfMarginPct !== null && fcfMarginPct >= config.quality.roicBypassFcfMarginPct;
+  if (eco?.roicPct != null && eco.roicPct < eco.discountRatePctUsed && !fcfBypass) {
     reasons.push(
-      `ROIC ${eco.roicPct}% below cost of capital ${eco.discountRatePctUsed}% — growth destroys value here`,
+      `ROIC ${eco.roicPct}% below cost of capital ${eco.discountRatePctUsed}% — growth destroys value here (no FCF-margin bypass: ${fcfMarginPct ?? "?"}% < ${config.quality.roicBypassFcfMarginPct}%)`,
     );
   }
 

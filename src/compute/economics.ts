@@ -108,7 +108,9 @@ export function computeEconomicView(
     streetGrowthPct = streetEpsGrowthPct;
     growthProxy = "eps";
   } else if (streetRevGrowthPct !== null) {
-    streetGrowthPct = unprofitable ? round1(streetRevGrowthPct * 0.5) : streetRevGrowthPct;
+    streetGrowthPct = unprofitable
+      ? round1(streetRevGrowthPct * config.economics.unprofitableRevenueHaircut)
+      : streetRevGrowthPct;
     growthProxy = unprofitable ? "revenue-penalized (unprofitable, no bottom-line estimate)" : "revenue";
   }
 

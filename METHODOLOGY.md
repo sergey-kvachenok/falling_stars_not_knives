@@ -48,9 +48,10 @@ names never reach the digest.
 ## 3. Economics — classical methods, deterministic (`src/compute/economics.ts`)
 
 Assumptions (config.economics): terminal growth g_T = 2.5%, tax = 21%, horizon N = 10 years.
-The discount rate is **risk-tiered**, not flat: base 10%, −2pts for profitable low-leverage
-mega-caps (>$100B), +2pts when any risk marker fires (netDebt/EBITDA > 1.5, FCF margin < 5%,
-or market cap < $5B). The rate used is shown with every economic view.
+The discount rate is **risk-tiered and STACKING**, not flat: base 10%, −2pts for profitable
+low-leverage mega-caps (>$100B), and **+2pts per risk marker** (netDebt/EBITDA > 1.5,
+FCF margin < 5%, market cap < $5B), capped at 16% — a cash-burning leveraged micro-cap is
+all three risks at once. The rate used is shown with every economic view.
 
 **EPV — earnings power value (Greenwald).** The value if the business never grows:
 
@@ -72,7 +73,10 @@ embeds margin change, keeping the comparison with implied FCF growth apples-to-a
 (revenue growth alone overstates cash growth when margins won't scale). EPS growth is
 incomputable for unprofitable companies (negative denominator); rather than silently
 falling back to revenue — the original trap — **unprofitable names without a bottom-line
-estimate take a 50% haircut on revenue growth**, and the proxy used is recorded.
+estimate take a haircut on revenue growth** (`unprofitableRevenueHaircut`, default 50%),
+and the proxy used is recorded. The haircut is a last resort and knowingly blunt — EPS
+growth is always preferred when computable; forward EBITDA/OCF consensus would be better
+still but is not available from free sources.
 
 Known limitations, monitored rather than solved: GAAP expenses R&D immediately, which
 depresses ROIC for research-heavy compounders vs capex-heavy industrials; and the stacked
@@ -115,14 +119,19 @@ recommended entry           = fair value × (1 − 20%)                  (requir
 
 1. grounded verdict (not `insufficient_evidence`), clean metrics
 2. positive TTM free cash flow
-3. low debt: net cash, or netDebt/EBITDA ≤ 2.5
+3. low debt: net cash, or (EBITDA > 0 AND netDebt/EBITDA ≤ 2.5) — the ratio is only ever
+   computed with a positive denominator, so a negative-EBITDA cash-burner cannot pass
+   with a "negative ratio"
 4. moat judged narrow or wide
 5. price ≥ 20% below fair value
 6. fair value ≤ 1.75 × street target (winner's-curse guard)
 7. **expectations gap ≥ 5pts, or price below the EPV floor** — the economic test:
    the market must be pricing in materially less than the evidence supports
-8. **ROIC ≥ cost of capital** — growth funded below its cost destroys value; a cheap
-   compounder of negative spreads is a value trap, not an opportunity
+8. **ROIC ≥ cost of capital, OR owner-FCF margin ≥ 15%** — growth funded below its cost
+   destroys value; a cheap compounder of negative spreads is a value trap. The FCF-margin
+   bypass exists because GAAP expenses R&D immediately, depressing ROIC for research-heavy
+   compounders — converting 15%+ of revenue to owner cash (already after SBC) proves value
+   creation regardless of the GAAP formula
 
 At most 5 names; zero qualifiers sends an explicit empty-list message with per-name reasons.
 
@@ -133,13 +142,17 @@ scoring job grades: kill-switches at 90 days (fired/survived/uncheckable), drift
 drop-class at 30/90 days, and at 1 year the realized-vs-fair error — the measured bias is
 reported in Sunday rollups and accumulates toward a display correction.
 
-## Worked example (RBLX, 2026-08-08, $36.57)
+## Worked example (RBLX, 2026-08-08, $36.57 — with all corrections applied)
 
-- FCF_TTM ≈ $1.0B, shares ≈ 700M-equivalent basis, net cash → EPV floor ≈ **$22.94/share**
-- Reverse DCF: $36.57 implies ≈ **4.6%/yr** FCF growth
-- Street forward revenue growth: **41.3%** → expectations gap **+36.7pts** → economically
-  qualified: the price assumes near-stagnation while consensus and filings show rapid growth
-- Contrast AAPL at $220: implies 9.9% vs street 12.1% — gap 2.2pts → **fairly priced, excluded**
+- Owner FCF (after subtracting ~$1B of stock-based compensation) collapses the naive
+  numbers: EPV floor **$5.84/share** (was $22.94 on phantom cash)
+- Reverse DCF at the risk-tiered 12% rate: $36.57 implies ≈ **25.2%/yr** owner-FCF growth
+- RBLX is GAAP-unprofitable with no computable EPS estimate → street revenue growth 41.3%
+  takes the haircut → conservative street growth **20.7%**
+- Expectations gap = 20.7 − 25.2 = **−4.5pts → disqualified**: the market already pays for
+  more growth than the conservative evidence supports
+- Contrast AAPL at $220 (8% rate — earned): implies 6.8% vs street 8.5%, gap 1.7pts,
+  ROIC 96% → **fairly priced, excluded**. The control case never moves.
 
 *Research queue, not investment advice. Estimates are disciplined arguments, not truths;
 the kill-switches and the calibration loop exist because they will sometimes be wrong.*
