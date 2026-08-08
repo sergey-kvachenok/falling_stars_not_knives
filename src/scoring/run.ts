@@ -107,6 +107,21 @@ async function main() {
   const driftSummary = [...byClass.entries()]
     .map(([cls, ds]) => `${cls}: ${(avg(ds) * 100).toFixed(1)}% avg drift vs SPY (n=${ds.length})`)
     .join("\n");
+  // Persist per-class base rates — once samples accumulate, cards and news
+  // reads cite them as empirical priors ("in our sample, sentiment drops
+  // averaged +X% vs SPY").
+  if (byClass.size > 0) {
+    const { writeState: ws2 } = await import("../lib/state.js");
+    ws2(
+      "classDrift",
+      Object.fromEntries(
+        [...byClass.entries()].map(([cls, ds]) => [
+          cls,
+          { n: ds.length, avgPct: Math.round(avg(ds) * 1000) / 10 },
+        ]),
+      ),
+    );
+  }
 
   const { loadFeedbackDb } = await import("../lib/db.js");
   const feedback = (await loadFeedbackDb().catch(() => null)) ?? readState<FeedbackEntry[]>("feedback", []);

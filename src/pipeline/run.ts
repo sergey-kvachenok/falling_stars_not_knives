@@ -104,11 +104,15 @@ async function main() {
       .map((f) => f.ticker)
       .filter((t, i, arr) => arr.indexOf(t) === i)
       .slice(0, config.news.maxCompaniesPerDay);
+    const { analyzeNews, newsReadHtml } = await import("../news/analyze.js");
     for (const t of targets) {
       const items = await fetchNews(t, titleByTicker.get(t) ?? t).catch(() => []);
       if (items.length === 0) continue;
-      const html = buildNewsHtml(t, titleByTicker.get(t) ?? t, items);
-      if (noTelegram) console.log(`[news ${t}] ${items.length} headline(s) (not sent)`);
+      // The AI reads the headlines against its own recorded thesis and
+      // kill-switches, so the message informs without opening a single link.
+      const read = await analyzeNews(t, items);
+      const html = buildNewsHtml(t, titleByTicker.get(t) ?? t, items) + (read ? newsReadHtml(read) : "");
+      if (noTelegram) console.log(`[news ${t}] ${items.length} headline(s), read: ${read?.thesisImpact ?? "unavailable"} (not sent)`);
       else await sendNews(t, html).catch((err) => console.warn(`news ${t}: ${(err as Error).message}`));
     }
   }

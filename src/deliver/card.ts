@@ -1,5 +1,6 @@
 import { entryPrice, impliedPrice, weightedAnchorPrice } from "../compute/anchors.js";
 import { adjustFairValue, loadCalibration } from "../compute/calibration.js";
+import { readState } from "../lib/state.js";
 import { config } from "../config.js";
 import type { CardRow } from "../lib/db.js";
 import type { DigestEntry } from "./report.js";
@@ -77,6 +78,14 @@ export function buildExpandedCard(e: DigestEntry): CardRow {
 
     // 🔍 Analysis — the analytical content as its own distinct section.
     parts.push(`\n🔍 <b>Analysis</b>`, esc(cut(v.oneLineThesis, 200)));
+    // Empirical base rate from our own graded history (needs n≥10 per class).
+    const classDrift = readState<Record<string, { n: number; avgPct: number }>>("classDrift", {});
+    const base = classDrift[c.primary];
+    if (base && base.n >= 10) {
+      parts.push(
+        `<i>base rate (our graded sample): ${esc(c.primary)} drops averaged ${base.avgPct > 0 ? "+" : ""}${base.avgPct}% vs SPY at 30-90d (n=${base.n})</i>`,
+      );
+    }
     const fy = m.fiveYear;
     if (fy) {
       parts.push(

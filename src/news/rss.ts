@@ -10,6 +10,7 @@ export interface NewsItem {
   link: string;
   source: string;
   pubDate: string;
+  snippet: string; // RSS description text — headline context for the AI read
 }
 
 export async function fetchNews(ticker: string, companyName: string): Promise<NewsItem[]> {
@@ -30,7 +31,12 @@ export async function fetchNews(ticker: string, companyName: string): Promise<Ne
     if (!title || !link) continue;
     const t = Date.parse(pubDate);
     if (Number.isFinite(t) && t < cutoff) continue;
-    items.push({ title, link, source: source || "unknown", pubDate });
+    const snippet = decode(pick(block, "description"))
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 300);
+    items.push({ title, link, source: source || "unknown", pubDate, snippet });
     if (items.length >= config.news.headlinesPerCompany) break;
   }
   return items;
