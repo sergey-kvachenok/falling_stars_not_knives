@@ -111,7 +111,9 @@ async function main() {
       // The AI reads the headlines against its own recorded thesis and
       // kill-switches, so the message informs without opening a single link.
       const read = await analyzeNews(t, items);
-      const html = buildNewsHtml(t, titleByTicker.get(t) ?? t, items) + (read ? newsReadHtml(read) : "");
+      // A tripped kill-switch is the one news event that demands attention.
+      const alert = read?.thesisImpact === "killswitch_trigger" ? `🚨🚨 <b>KILL-SWITCH ALERT — ${t}</b> 🚨🚨\n` : "";
+      const html = alert + buildNewsHtml(t, titleByTicker.get(t) ?? t, items) + (read ? newsReadHtml(read) : "");
       if (noTelegram) console.log(`[news ${t}] ${items.length} headline(s), read: ${read?.thesisImpact ?? "unavailable"} (not sent)`);
       else await sendNews(t, html).catch((err) => console.warn(`news ${t}: ${(err as Error).message}`));
     }

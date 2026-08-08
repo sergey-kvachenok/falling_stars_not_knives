@@ -99,6 +99,22 @@ export const config = {
     maxCompaniesPerDay: 5,
     headlinesPerCompany: 4,
     freshHours: 48,
+    // Low-signal sources filtered in code BEFORE the AI sees anything —
+    // SEO clickbait and rating churn misread as thesis events otherwise.
+    bannedSources: [
+      "Motley Fool",
+      "Zacks",
+      "Seeking Alpha",
+      "Benzinga",
+      "InvestorPlace",
+      "Simply Wall St",
+      "TipRanks",
+      "MarketBeat",
+      "StockNews.com",
+      "PRNewswire",
+      "GlobeNewswire",
+      "Accesswire",
+    ],
   },
   memory: {
     // 👎 names stay out of the digest this long unless a new filing appears.

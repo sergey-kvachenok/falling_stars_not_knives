@@ -31,6 +31,11 @@ export async function fetchNews(ticker: string, companyName: string): Promise<Ne
     if (!title || !link) continue;
     const t = Date.parse(pubDate);
     if (Number.isFinite(t) && t < cutoff) continue;
+    // Signal filter runs in code, before any AI: clickbait mills and press-
+    // release wires produce false thesis events, not information.
+    if (config.news.bannedSources.some((b) => source.toLowerCase().includes(b.toLowerCase()))) continue;
+    // Law-firm class-action spam: routine after any drop, informationless.
+    if (/class action|investors? rights|law (firm|offices)|deadline alert|lawsuit reminder/i.test(title)) continue;
     const snippet = decode(pick(block, "description"))
       .replace(/<[^>]+>/g, " ")
       .replace(/\s+/g, " ")
