@@ -135,12 +135,13 @@ async function main() {
       }
       // Empirical valuation anchors: the company's own multiple history and
       // the street's forward revenue — both bound the AI's assumptions.
-      const { getMonthlyCloses, getForwardRevenue, getAnalystTarget } = await import("../screen/quotes.js");
-      const [closes, streetRev, streetTarget] = await Promise.all([
+      const { getMonthlyCloses, getForwardEstimates, getAnalystTarget } = await import("../screen/quotes.js");
+      const [closes, street, streetTarget] = await Promise.all([
         getMonthlyCloses(c.ticker),
-        getForwardRevenue(c.ticker),
+        getForwardEstimates(c.ticker),
         getAnalystTarget(c.ticker),
       ]);
+      const streetRev = street.revenue1y;
       const { historicalMultipleRanges, currentMultiples } = await import("../compute/multiples.js");
       bundle.drop!.multipleRanges = historicalMultipleRanges(
         closes,
@@ -151,7 +152,7 @@ async function main() {
       bundle.drop!.streetRevenue1yUsd = streetRev;
       bundle.drop!.analystTargetPrice = streetTarget;
       const { computeEconomicView } = await import("../compute/economics.js");
-      bundle.drop!.economics = computeEconomicView(c.price, bundle.metrics, streetRev);
+      bundle.drop!.economics = computeEconomicView(c.price, bundle.metrics, streetRev, street.epsGrowthPct);
 
       const { record, cacheHit } = await analyzeWithCache(bundle);
       if (cacheHit) cacheHits++;

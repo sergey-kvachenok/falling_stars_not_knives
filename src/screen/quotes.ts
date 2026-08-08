@@ -121,17 +121,27 @@ export async function getMonthlyCloses(symbol: string): Promise<{ date: string; 
   }
 }
 
-/** Street forward revenue consensus (next fiscal year) — anchor for assumed values. */
-export async function getForwardRevenue(symbol: string): Promise<number | null> {
+/** Street forward estimates (next FY): revenue level and EPS growth vs current FY. */
+export async function getForwardEstimates(
+  symbol: string,
+): Promise<{ revenue1y: number | null; epsGrowthPct: number | null }> {
   try {
     const res = (await yf.quoteSummary(symbol, { modules: ["earningsTrend"] }, { validateResult: false })) as {
-      earningsTrend?: { trend?: { period?: string; revenueEstimate?: { avg?: number } }[] };
+      earningsTrend?: {
+        trend?: { period?: string; revenueEstimate?: { avg?: number }; earningsEstimate?: { avg?: number } }[];
+      };
     };
-    const nextYear = res.earningsTrend?.trend?.find((t) => t.period === "+1y");
-    const avg = nextYear?.revenueEstimate?.avg;
-    return typeof avg === "number" && avg > 0 ? avg : null;
+    const byPeriod = (p: string) => res.earningsTrend?.trend?.find((t) => t.period === p);
+    const rev = byPeriod("+1y")?.revenueEstimate?.avg;
+    const eps1 = byPeriod("+1y")?.earningsEstimate?.avg;
+    const eps0 = byPeriod("0y")?.earningsEstimate?.avg;
+    const epsGrowthPct =
+      typeof eps1 === "number" && typeof eps0 === "number" && eps0 > 0
+        ? Math.round((eps1 / eps0 - 1) * 1000) / 10
+        : null;
+    return { revenue1y: typeof rev === "number" && rev > 0 ? rev : null, epsGrowthPct };
   } catch {
-    return null;
+    return { revenue1y: null, epsGrowthPct: null };
   }
 }
 

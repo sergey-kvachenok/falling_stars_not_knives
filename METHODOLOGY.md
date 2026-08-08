@@ -20,7 +20,9 @@ From the quarterly series (`src/compute/metrics.ts`):
 
 ```
 TTM x        = sum of the trailing four quarters of x
-FCF          = CFO − capex                    (equity cash flow; CFO is post-interest)
+FCF          = CFO − capex − SBC              (owner cash flow; stock comp is a real
+                                               cost paid in dilution — never added back)
+ROIC         = EBIT_TTM × (1 − tax) / (equity + debt − cash)
 EBIT         = operating income
 net debt     = (long-term + current debt) − (cash + short-term investments)
 margins      = metric / revenue, with QoQ/YoY basis-point trends
@@ -44,8 +46,10 @@ names never reach the digest.
 
 ## 3. Economics — classical methods, deterministic (`src/compute/economics.ts`)
 
-Assumptions (config.economics): discount rate r = 10%, terminal growth g_T = 2.5%,
-tax = 21%, horizon N = 10 years.
+Assumptions (config.economics): terminal growth g_T = 2.5%, tax = 21%, horizon N = 10 years.
+The discount rate is **risk-tiered**, not flat: base 10%, −2pts for profitable low-leverage
+mega-caps (>$100B), +2pts when any risk marker fires (netDebt/EBITDA > 1.5, FCF margin < 5%,
+or market cap < $5B). The rate used is shown with every economic view.
 
 **EPV — earnings power value (Greenwald).** The value if the business never grows:
 
@@ -61,8 +65,10 @@ solve (bisection) for the growth rate g that prices it:
 marketCap = Σ_{t=1..N} FCF₀(1+g)^t / (1+r)^t  +  FCF₀(1+g)^N (1+g_T) / ((r−g_T)(1+r)^N)
 ```
 
-**Expectations gap** = street forward revenue growth − market-implied growth. Positive =
-the market prices in less growth than consensus expects.
+**Expectations gap** = conservative street growth − market-implied growth, where street
+growth = **min(forward revenue growth, forward EPS growth)** — the bottom-line estimate
+embeds margin change, keeping the comparison with implied FCF growth apples-to-apples
+(revenue growth alone overstates cash growth when margins won't scale).
 
 ## 4. AI scenarios — judgment, fenced by validation
 
@@ -71,7 +77,9 @@ metric (EV/Sales, EV/EBITDA, P/E, P/S, P/FCF, P/B), multiple, and the assumed ab
 metric value at that horizon. Rejected-and-retried unless ALL hold (`src/analyst/validate.ts`):
 
 - every factual claim cites a filing accession number or data field present in the bundle
-- multiple inside the company's own historical p25–p75 band (×0.6/×1.6 tolerance)
+- multiple inside the company's own historical p25–p75 band (×0.6/×1.6 tolerance);
+  going BELOW the band is allowed only with a cited `regimeShiftJustification` naming the
+  structural break (secular decline makes history irrelevant) — no upward override exists
 - 1y sales assumptions within ±40% of street consensus, and must engage it
 - **bear realism**: 1y bear implied price ≤ 1.15 × current price
 - **fade**: 3y multiple ≤ 1.1 × 1y multiple (same metric)
@@ -103,6 +111,8 @@ recommended entry           = fair value × (1 − 20%)                  (requir
 6. fair value ≤ 1.75 × street target (winner's-curse guard)
 7. **expectations gap ≥ 5pts, or price below the EPV floor** — the economic test:
    the market must be pricing in materially less than the evidence supports
+8. **ROIC ≥ cost of capital** — growth funded below its cost destroys value; a cheap
+   compounder of negative spreads is a value trap, not an opportunity
 
 At most 5 names; zero qualifiers sends an explicit empty-list message with per-name reasons.
 

@@ -3,10 +3,17 @@ import { test } from "node:test";
 import { computeEconomicView, presentValue, solveImpliedGrowth } from "./economics.js";
 import type { ComputedMetrics } from "./metrics.js";
 
-const metrics = (over: Partial<{ ebit: number | null; fcf: number | null; revenue: number | null }> = {}): ComputedMetrics =>
+const metrics = (over: Partial<{ ebit: number | null; fcf: number | null; revenue: number | null; equity: number; debt: number }> = {}): ComputedMetrics =>
   ({
     dilution: { sharesOutstanding: { value: 100_000_000, accn: "a" }, yoyChangePct: null },
-    balance: { netDebt: 1_000_000_000 },
+    balance: {
+      netDebt: 1_000_000_000,
+      netDebtToEbitdaTtm: null,
+      equityBook: { value: over.equity ?? 8_000_000_000, accn: "a" },
+      totalDebt: { value: over.debt ?? 2_000_000_000, accn: "a" },
+      cashAndSti: { value: 1_000_000_000, accn: "a" },
+    },
+    margins: { fcfPct: { latestPct: 10, qoqBp: null, yoyBp: null, accn: "a" } },
     ttm: {
       revenue: over.revenue ?? 10_000_000_000,
       ebitda: null,
@@ -37,6 +44,26 @@ test("expectations gap: implied vs street", () => {
   assert.ok(v.impliedGrowthPct !== null && Math.abs(v.impliedGrowthPct) < 0.5, `implied ${v.impliedGrowthPct}`);
   assert.equal(v.streetGrowthPct, 12);
   assert.ok(v.expectationsGapPts! > 11, `gap ${v.expectationsGapPts}`);
+});
+
+test("ROIC computed from NOPAT over invested capital", () => {
+  // NOPAT = 2B × 0.79 = 1.58B; invested = 8B + 2B − 1B = 9B → 17.6%
+  const v = computeEconomicView(50, metrics(), null);
+  assert.equal(v.roicPct, 17.6);
+});
+
+test("street growth takes the conservative min of revenue and EPS growth", () => {
+  const v = computeEconomicView(50, metrics(), 11_200_000_000, 4); // rev +12%, eps +4%
+  assert.equal(v.streetGrowthPct, 4);
+});
+
+test("risk tiers move the discount rate", () => {
+  // default metrics: $50 × 100M = $5B cap, fcf margin 10 → base 10%
+  assert.equal(computeEconomicView(50, metrics(), null).discountRatePctUsed, 10);
+  // mega-cap, profitable, low leverage → 8%
+  assert.equal(computeEconomicView(1_500, metrics(), null).discountRatePctUsed, 8);
+  // small cap (<$5B) → 12%
+  assert.equal(computeEconomicView(20, metrics(), null).discountRatePctUsed, 12);
 });
 
 test("no positive FCF → implied growth incomputable; EPV falls back through EBIT", () => {

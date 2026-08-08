@@ -124,6 +124,11 @@ export const VERDICT_SCHEMA = {
                 description: "Assumed absolute USD value of the metric in this scenario at this horizon (e.g. EBITDA 1200000000)",
               },
               rationale: { type: "STRING", description: "Why this multiple and this assumed value" },
+              regimeShiftJustification: {
+                type: "STRING",
+                description:
+                  "ONLY when going below the historical multiple band: name the structural break (lost patent, secular decline, downgrade) grounded in the filings. Empty string otherwise.",
+              },
             },
             required: ["metric", "multiple", "assumedMetricValueUsd", "rationale"],
           },
@@ -172,6 +177,7 @@ export interface Verdict {
       multiple: number;
       assumedMetricValueUsd: number;
       rationale: string;
+      regimeShiftJustification?: string;
     };
     falsifier: string;
   }[];

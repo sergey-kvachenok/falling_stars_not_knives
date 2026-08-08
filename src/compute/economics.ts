@@ -21,18 +21,46 @@ export interface EconomicView {
   epvPerShare: number | null;
   /** FCF growth rate (%/yr over the fade horizon) implied by the current price. */
   impliedGrowthPct: number | null;
-  /** Street forward revenue growth (next-FY consensus vs TTM), %. */
+  /**
+   * Conservative street growth: min(forward revenue growth, forward EPS growth)
+   * — the bottom-line estimate embeds margin change, keeping the comparison
+   * with implied FCF growth apples-to-apples.
+   */
   streetGrowthPct: number | null;
   /** streetGrowthPct − impliedGrowthPct: positive = market more pessimistic than the street. */
   expectationsGapPts: number | null;
+  /** Risk-tiered discount rate actually used (%, e.g. 12 for risky names). */
+  discountRatePctUsed: number;
+  /** Return on invested capital, TTM — growth destroys value when below the discount rate. */
+  roicPct: number | null;
+}
+
+/**
+ * A flat discount rate treats a leveraged small-cap like a mega-cap
+ * compounder. Deterministic tiers: base rate ±2pts on visible risk markers.
+ */
+export function riskAdjustedDiscountRate(price: number | null, m: ComputedMetrics): number {
+  const base = config.economics.discountRate;
+  const shares = m.dilution?.sharesOutstanding?.value ?? null;
+  const mcapB = price && shares ? (price * shares) / 1e9 : null;
+  const nde = m.balance?.netDebtToEbitdaTtm ?? null;
+  const fcfMarginPct = m.margins?.fcfPct?.latestPct ?? null;
+  const risky =
+    (nde !== null && nde > 1.5) || (fcfMarginPct !== null && fcfMarginPct < 5) || (mcapB !== null && mcapB < 5);
+  if (risky) return base + 0.02;
+  const ebit = m.ttm?.ebit ?? null;
+  const stable = mcapB !== null && mcapB > 100 && ebit !== null && ebit > 0 && (nde === null || nde < 1.5);
+  return stable ? base - 0.02 : base;
 }
 
 export function computeEconomicView(
   price: number | null,
   m: ComputedMetrics,
   streetRevenue1yUsd: number | null,
+  streetEpsGrowthPct: number | null = null,
 ): EconomicView {
-  const { discountRate, terminalGrowth, taxRate, fadeYears } = config.economics;
+  const { terminalGrowth, taxRate, fadeYears } = config.economics;
+  const discountRate = riskAdjustedDiscountRate(price, m);
   const shares = m.dilution?.sharesOutstanding?.value ?? null;
   const netDebt = m.balance?.netDebt ?? 0;
   // Bundles serialized before the ttm field existed deserialize without it.
@@ -58,10 +86,22 @@ export function computeEconomicView(
     impliedGrowthPct = g === null ? null : round1(g * 100);
   }
 
-  const streetGrowthPct =
-    streetRevenue1yUsd && t.revenue && t.revenue > 0
-      ? round1((streetRevenue1yUsd / t.revenue - 1) * 100)
-      : null;
+  // Apples-to-apples: revenue growth alone overstates cash growth when
+  // margins won't scale; take the more conservative of revenue and EPS growth.
+  const streetRevGrowthPct =
+    streetRevenue1yUsd && t.revenue && t.revenue > 0 ? round1((streetRevenue1yUsd / t.revenue - 1) * 100) : null;
+  const candidates = [streetRevGrowthPct, streetEpsGrowthPct].filter((x): x is number => x !== null);
+  const streetGrowthPct = candidates.length > 0 ? Math.min(...candidates) : null;
+
+  // ROIC vs cost of capital: growth funded below its cost destroys value.
+  let roicPct: number | null = null;
+  const equity = m.balance?.equityBook?.value ?? null;
+  const debt = m.balance?.totalDebt?.value ?? null;
+  const cash = m.balance?.cashAndSti?.value ?? null;
+  if (t.ebit !== null && equity !== null && debt !== null) {
+    const invested = equity + debt - (cash ?? 0);
+    if (invested > 0) roicPct = round1(((t.ebit * (1 - taxRate)) / invested) * 100);
+  }
 
   return {
     epvPerShare,
@@ -69,6 +109,8 @@ export function computeEconomicView(
     streetGrowthPct,
     expectationsGapPts:
       impliedGrowthPct !== null && streetGrowthPct !== null ? round1(streetGrowthPct - impliedGrowthPct) : null,
+    discountRatePctUsed: round1(discountRate * 100),
+    roicPct,
   };
 }
 

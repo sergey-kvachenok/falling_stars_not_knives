@@ -87,7 +87,11 @@ export function computeMetrics(series: FactsByConcept): ComputedMetrics {
   // Gross profit: direct tag, else revenue − cost of revenue (aligned by quarter end).
   const grossByEnd = gross.length > 0 ? gross : subtractAligned(rev, cost);
 
-  const fcf = subtractAligned(cfo, capex);
+  // Owner FCF = CFO − capex − SBC. Stock comp is added back to CFO as
+  // "non-cash" but is a real cost paid in dilution; leaving it in inflates
+  // FCF, the EPV floor, and the implied-growth solve (the SBC illusion).
+  const sbc = quarterly(series, "sbc");
+  const fcf = subtractAlignedOptional(subtractAligned(cfo, capex), sbc);
   const ebitdaQ = addAligned(opInc, da);
 
   const cashPts = series.cash?.instant ?? [];
@@ -223,6 +227,12 @@ export function subtractAligned(a: QuarterPoint[], b: QuarterPoint[]): QuarterPo
   return a
     .filter((p) => bByEnd.has(p.end))
     .map((p) => ({ ...p, val: p.val - bByEnd.get(p.end)!.val }));
+}
+
+/** a − b by quarter end, treating quarters missing in b as zero (optional cost). */
+export function subtractAlignedOptional(a: QuarterPoint[], b: QuarterPoint[]): QuarterPoint[] {
+  const bByEnd = new Map(b.map((p) => [p.end, p]));
+  return a.map((p) => ({ ...p, val: p.val - (bByEnd.get(p.end)?.val ?? 0) }));
 }
 
 export function addAligned(a: QuarterPoint[], b: QuarterPoint[]): QuarterPoint[] {

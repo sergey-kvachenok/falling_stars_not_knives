@@ -52,7 +52,12 @@ const RULES = `RULES — read carefully:
   benchmarks — never against management's own guidance; a bar management sets is not a test.
 - When scenarios use P/FCF, check capexPctRevenueTtm: rising capital intensity (e.g. a shift
   to owned infrastructure) suppresses FCF conversion — reflect it in the assumed FCF, and
-  prefer a capex-aware falsifier.`;
+  prefer a capex-aware falsifier.
+- FCF in the computed metrics is AFTER subtracting stock-based compensation — dilution is a
+  real cost. Never add SBC back; never treat CFO as owner cash flow.
+- You may go BELOW the historical multiple band only by filling regimeShiftJustification with
+  the specific structural break (lost patent, secular decline, covenant breach) grounded in
+  the filings. There is no override for going above the band.`;
 
 export interface PromptOpts {
   anonymize?: boolean;

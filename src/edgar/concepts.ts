@@ -82,6 +82,15 @@ export const CONCEPTS: ConceptDef[] = [
     ],
   },
   {
+    // Stock-based compensation — a real economic cost paid in dilution; FCF
+    // subtracts it (the SBC illusion: CFO adds it back as "non-cash").
+    name: "sbc",
+    taxonomy: "us-gaap",
+    unit: "USD",
+    kind: "duration",
+    tags: ["ShareBasedCompensation", "AllocatedShareBasedCompensationExpense"],
+  },
+  {
     name: "interestExpense",
     taxonomy: "us-gaap",
     unit: "USD",

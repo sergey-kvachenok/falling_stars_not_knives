@@ -96,12 +96,23 @@ export function validateVerdict(
         }
       }
       // Empirical bound #1: the multiple must live near the company's own
-      // historical range when one exists.
+      // historical range when one exists. Going BELOW the band is allowed
+      // only with a cited structural break (regime shift) — secular decline
+      // makes history irrelevant. There is no upward override: euphoria has
+      // no regime-shift defense.
       const range = drop?.multipleRanges?.find((r) => r.metric === a.metric);
-      if (range && (a.multiple < range.p25 * 0.6 || a.multiple > range.p75 * 1.6)) {
-        problems.push(
-          `multiple ${a.multiple}× ${a.metric} for ${s.horizonYears}y ${s.scenarioCase} is far outside the historical range (p25 ${range.p25} – p75 ${range.p75}) — stay inside it or pick a different metric`,
-        );
+      if (range) {
+        const regimeShift = (a.regimeShiftJustification ?? "").trim().length >= 40;
+        if (a.multiple < range.p25 * 0.6 && !regimeShift) {
+          problems.push(
+            `multiple ${a.multiple}× ${a.metric} for ${s.horizonYears}y ${s.scenarioCase} is below the historical band (p25 ${range.p25}) — either stay inside it, or provide regimeShiftJustification naming the structural break`,
+          );
+        }
+        if (a.multiple > range.p75 * 1.6) {
+          problems.push(
+            `multiple ${a.multiple}× ${a.metric} for ${s.horizonYears}y ${s.scenarioCase} is far above the historical range (p75 ${range.p75}) — no override exists for optimism`,
+          );
+        }
       }
       // Empirical bound #2: 1y sales assumptions must stay near street consensus.
       const street = drop?.streetRevenue1yUsd;

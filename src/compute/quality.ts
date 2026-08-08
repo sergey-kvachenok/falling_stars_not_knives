@@ -79,6 +79,14 @@ export function digestGate(bundle: TickerBundle, verdict: Verdict | null): GateR
     }
   }
 
+  // Value-creation test: growth funded below its cost of capital destroys
+  // value — a cheap-looking compounder of negative spreads is a trap.
+  if (eco?.roicPct != null && eco.roicPct < eco.discountRatePctUsed) {
+    reasons.push(
+      `ROIC ${eco.roicPct}% below cost of capital ${eco.discountRatePctUsed}% — growth destroys value here`,
+    );
+  }
+
   // Winner's-curse guard: when our fair value dwarfs the street's, the
   // likeliest explanation is our assumptions, not a market-wide blind spot.
   const street = bundle.drop?.analystTargetPrice;
