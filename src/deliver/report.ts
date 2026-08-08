@@ -57,10 +57,14 @@ export function buildDigest(
       v && e.seenNote && v.changeSincePrior && !/^first look/i.test(v.changeSincePrior)
         ? `\nΔ ${esc(truncate(v.changeSincePrior, 130))}`
         : "";
+    const eco = drop?.economics;
+    const ecoLine = eco
+      ? `\neconomics: market implies ${eco.impliedGrowthPct ?? "?"}%/yr vs street ${eco.streetGrowthPct ?? "?"}% · EPV floor ${$p(eco.epvPerShare)}`
+      : "";
     lines.push(
       `${i + 1}. <b>${esc(e.ticker)}</b> — ${esc(truncate(e.bundle.company.name, 30))}${moat}${seen}\n` +
         `current price: ${$p(price)}\n` +
-        `ai fair value: <b>${$p(fair)}</b>${underv}\n` +
+        `ai fair value: <b>${$p(fair)}</b>${underv}${ecoLine}\n` +
         `ai target 1y: ${target("1")}\n` +
         `ai target 3y: ${target("3")}\n` +
         `analyst consensus: ${$p(drop?.analystTargetPrice ?? null)}\n` +

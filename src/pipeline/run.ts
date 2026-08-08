@@ -150,6 +150,8 @@ async function main() {
       bundle.drop!.currentMultiples = currentMultiples(c.price, bundle.metrics);
       bundle.drop!.streetRevenue1yUsd = streetRev;
       bundle.drop!.analystTargetPrice = streetTarget;
+      const { computeEconomicView } = await import("../compute/economics.js");
+      bundle.drop!.economics = computeEconomicView(c.price, bundle.metrics, streetRev);
 
       const { record, cacheHit } = await analyzeWithCache(bundle);
       if (cacheHit) cacheHits++;

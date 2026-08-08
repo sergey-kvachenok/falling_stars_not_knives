@@ -85,6 +85,16 @@ median-to-p75 requires strong filed evidence.\n`
     bundle.drop?.streetRevenue1yUsd != null
       ? `STREET FORWARD ESTIMATE: consensus next-FY revenue ≈ $${(bundle.drop.streetRevenue1yUsd / 1e9).toFixed(2)}B.\n`
       : "";
+  const eco = bundle.drop?.economics;
+  const ecoSection = eco
+    ? `ECONOMIC VIEW (deterministic, code-computed — 10% discount, 2.5% terminal):
+  EPV floor (value at ZERO growth forever): ${eco.epvPerShare !== null ? `$${eco.epvPerShare}/share` : "not computable (no positive earnings)"}
+  FCF growth the CURRENT price implies: ${eco.impliedGrowthPct !== null ? `${eco.impliedGrowthPct}%/yr` : "not computable"}
+  Street forward revenue growth: ${eco.streetGrowthPct !== null ? `${eco.streetGrowthPct}%` : "unknown"}
+Your scenarios must engage this frame: the bull case must name what the market is missing at
+the implied growth rate; if the implied growth already matches or exceeds what the filings
+support, say so — that is a fairly-priced company, not an opportunity.\n`
+    : "";
 
   const dropDesc = bundle.drop
     ? `day ${fmtPct(bundle.drop.dayChangePct)}, month ${fmtPct(bundle.drop.monthChangePct)}, ` +
@@ -140,7 +150,7 @@ ${RULES}
 
 COMPANY: ${name} — SIC ${bundle.company.sicDescription}
 DROP CONTEXT: ${dropDesc}
-${rangesSection}${streetSection}${no8k}${priorSection}
+${rangesSection}${streetSection}${ecoSection}${no8k}${priorSection}
 CITABLE SOURCES (the only valid citation values):
 ${[...validSources].map((s) => `  - ${s}`).join("\n")}
 

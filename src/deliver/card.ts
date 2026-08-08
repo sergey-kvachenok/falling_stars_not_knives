@@ -36,12 +36,20 @@ export function buildExpandedCard(e: DigestEntry): CardRow {
       weightedAnchor1y !== null
         ? Math.round(weightedAnchor1y * (1 - config.valuation.requiredDiscountToFair) * 100) / 100
         : null;
+    const eco = e.bundle.drop?.economics;
     parts.push(
       `\n💰 <b>Valuation</b>`,
       `AI fair value (blended 1y anchor): <b>${$(weightedAnchor1y)}</b>`,
       `analyst consensus: ${$(street)}`,
       `recommended entry price: ≤ <b>${$(entryRec)}</b>`,
       `price at analysis: ${$(refPrice)}${discount}`,
+      ...(eco
+        ? [
+            `EPV floor (zero-growth value): ${$(eco.epvPerShare)}`,
+            `market-implied growth: ${eco.impliedGrowthPct ?? "?"}%/yr · street expects ${eco.streetGrowthPct ?? "?"}%` +
+              (eco.expectationsGapPts !== null ? ` · gap ${eco.expectationsGapPts > 0 ? "+" : ""}${eco.expectationsGapPts}pts` : ""),
+          ]
+        : []),
     );
 
     // 🎯 Scenarios: estimated price at horizon + best entry for the hurdle return.

@@ -61,6 +61,24 @@ export function digestGate(bundle: TickerBundle, verdict: Verdict | null): GateR
     reasons.push(`moat: ${verdict.moat?.assessment ?? "missing"}`);
   }
 
+  // Economic qualification (expectations investing): the market must be
+  // implying meaningfully LESS growth than the street expects — otherwise
+  // the "undervaluation" is only our multiple math disagreeing with the
+  // market's. Price below the EPV floor (worth more with zero growth) also
+  // qualifies.
+  const eco = bundle.drop?.economics;
+  if (eco && price !== null) {
+    const belowEpv = eco.epvPerShare !== null && price < eco.epvPerShare;
+    const gapOk = eco.expectationsGapPts !== null && eco.expectationsGapPts >= config.economics.minExpectationsGapPts;
+    if (!belowEpv && !gapOk) {
+      reasons.push(
+        eco.expectationsGapPts !== null
+          ? `no expectations gap: market implies ${eco.impliedGrowthPct}%/yr vs street ${eco.streetGrowthPct}% (gap ${eco.expectationsGapPts}pts, need ≥${config.economics.minExpectationsGapPts}) and price above EPV floor`
+          : `economic view incomputable (no positive FCF/earnings to capitalize) — cannot verify the discount economically`,
+      );
+    }
+  }
+
   // Winner's-curse guard: when our fair value dwarfs the street's, the
   // likeliest explanation is our assumptions, not a market-wide blind spot.
   const street = bundle.drop?.analystTargetPrice;

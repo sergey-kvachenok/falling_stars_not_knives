@@ -37,7 +37,7 @@ export const config = {
     maxCitationRetries: 2,
     maxOutputTokens: 8192,
     // Part of the bundle hash — bump on ANY prompt or schema change (PLAN.md §6.2).
-    promptVersion: 10,
+    promptVersion: 11,
   },
   valuation: {
     // "Best entry" per scenario = estimated price discounted so the scenario
@@ -46,6 +46,16 @@ export const config = {
     // A name enters the digest only if price ≤ (1 − this) × AI fair value.
     // Also defines the recommended entry price: fair × (1 − this).
     requiredDiscountToFair: 0.2,
+  },
+  economics: {
+    // Standard textbook defaults — arguable, therefore visible and adjustable.
+    discountRate: 0.1,
+    terminalGrowth: 0.025,
+    taxRate: 0.21,
+    fadeYears: 10,
+    // Digest requires the market to imply at least this much LESS growth than
+    // the street expects (expectations gap), unless price sits below EPV.
+    minExpectationsGapPts: 5,
   },
   quality: {
     // Deterministic health gates — a name failing any is excluded (logged).

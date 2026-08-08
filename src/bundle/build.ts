@@ -34,6 +34,8 @@ export interface TickerBundle {
     currentMultiples?: { metric: string; value: number }[];
     /** Street next-FY revenue consensus — anchors assumed values. */
     streetRevenue1yUsd?: number | null;
+    /** Deterministic valuation economics: EPV floor + market-implied growth. */
+    economics?: import("../compute/economics.js").EconomicView;
   };
   documents: {
     /** Empty = no filing explains the drop window. That absence is itself a signal. */

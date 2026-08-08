@@ -145,6 +145,25 @@ export function validateVerdict(
     }
   }
 
+  // Multiple fade: businesses mature and multiples compress — a 3y multiple
+  // above the 1y multiple (same metric, same case) assumes re-expansion on
+  // top of growth, double-counting the bull thesis.
+  for (const cs of ["bear", "base", "bull"]) {
+    const s1 = v.scenarios.find((s) => s.horizonYears === "1" && s.scenarioCase === cs);
+    const s3 = v.scenarios.find((s) => s.horizonYears === "3" && s.scenarioCase === cs);
+    if (
+      s1 &&
+      s3 &&
+      s1.valuationAnchor.metric !== "none" &&
+      s1.valuationAnchor.metric === s3.valuationAnchor.metric &&
+      s3.valuationAnchor.multiple > s1.valuationAnchor.multiple * 1.1
+    ) {
+      problems.push(
+        `${cs}: 3y multiple ${s3.valuationAnchor.multiple}× exceeds 1y ${s1.valuationAnchor.multiple}× — multiples fade as businesses mature; growth belongs in the metric value, not the multiple`,
+      );
+    }
+  }
+
   // Cross-horizon coherence: the 1y and 3y paths must describe the same
   // company. Metric-switching (EV/Sales at 1y, P/E on early earnings at 3y)
   // produced a 3y base at a third of the 1y base — each plausible alone,

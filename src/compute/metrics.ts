@@ -37,6 +37,7 @@ export interface ComputedMetrics {
   ttm: {
     revenue: number | null;
     ebitda: number | null;
+    ebit: number | null;
     netIncome: number | null;
     fcf: number | null;
   };
@@ -165,6 +166,7 @@ export function computeMetrics(series: FactsByConcept): ComputedMetrics {
     ttm: {
       revenue: ttm(rev),
       ebitda: ebitdaTtm,
+      ebit: ebitTtm,
       netIncome: ttm(netInc),
       fcf: ttm(fcf),
     },
