@@ -87,6 +87,19 @@ test("a bear case far above the current price is rejected", () => {
   assert.ok(!ok.problems.some((p) => p.includes("ABOVE the current")));
 });
 
+test("base/bull kill-switches tied to management guidance are rejected", () => {
+  const v = goodVerdict();
+  const base1y = v.scenarios.find((s) => s.horizonYears === "1" && s.scenarioCase === "base")!;
+  base1y.falsifier = "Q3 revenue failing to reach or exceed guidance of $650 million.";
+  const r = validateVerdict(v, VALID);
+  assert.ok(r.problems.some((p) => p.includes("management guidance")), r.problems.join(";"));
+  // bear cases MAY reference guidance (missing your own lowered bar is genuinely bearish)
+  const bear1y = v.scenarios.find((s) => s.horizonYears === "1" && s.scenarioCase === "bear")!;
+  bear1y.falsifier = "Revenue missing even the lowered guidance of $650 million for Q3.";
+  const r2 = validateVerdict(v, VALID);
+  assert.ok(!r2.problems.some((p) => p.includes("bear kill-switch uses management guidance")));
+});
+
 test("scenario weights must sum to ~1 per horizon", () => {
   const v = goodVerdict();
   for (const s of v.scenarios) if (s.horizonYears === "1") s.narrativeWeight = 0.6; // sums to 1.8

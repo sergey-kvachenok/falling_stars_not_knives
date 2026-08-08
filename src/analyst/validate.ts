@@ -55,6 +55,16 @@ export function validateVerdict(
     if (VAGUE_FALSIFIER.test(s.falsifier) || s.falsifier.length < 20) {
       problems.push(`vague falsifier for ${s.horizonYears}y ${s.scenarioCase}: "${s.falsifier}"`);
     }
+    // Management's own guidance is a bar management sets — clearing it tests
+    // nothing. Base/bull kill-switches need independent benchmarks.
+    if (
+      (s.scenarioCase === "base" || s.scenarioCase === "bull") &&
+      /guidance|management'?s? (guide|outlook|forecast|target)/i.test(s.falsifier)
+    ) {
+      problems.push(
+        `${s.horizonYears}y ${s.scenarioCase} kill-switch uses management guidance as the bar — tie it to year-over-year growth or an independent benchmark instead`,
+      );
+    }
     const a = s.valuationAnchor;
     // A card without numbers is useless: every scenario must price unless the
     // verdict is insufficient_evidence (shares availability permitting).

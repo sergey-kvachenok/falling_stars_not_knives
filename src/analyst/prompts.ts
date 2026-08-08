@@ -45,7 +45,14 @@ const RULES = `RULES — read carefully:
 - The 1y and 3y scenarios must describe ONE coherent trajectory per case: prefer the same
   metric family at both horizons. Never value a low-margin growth company on sales at 1y and
   then on early-stage earnings at 3y — that produces two different companies. A 3y value far
-  below the same case's 1y value is only valid if the 1y path already shows the decline.`;
+  below the same case's 1y value is only valid if the 1y path already shows the decline.
+- The bear case IS the structural-decline case: assume today's post-drop multiple and today's
+  growth rate simply persist. A bear that assumes any recovery is a base case wearing a costume.
+- Kill-switches for base and bull must be defined against year-over-year growth or independent
+  benchmarks — never against management's own guidance; a bar management sets is not a test.
+- When scenarios use P/FCF, check capexPctRevenueTtm: rising capital intensity (e.g. a shift
+  to owned infrastructure) suppresses FCF conversion — reflect it in the assumed FCF, and
+  prefer a capex-aware falsifier.`;
 
 export interface PromptOpts {
   anonymize?: boolean;

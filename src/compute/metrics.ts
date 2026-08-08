@@ -29,6 +29,9 @@ export interface ComputedMetrics {
   cashFlow: {
     fcfLatestQ: MetricValue | null; // CFO − capex
     cfoTtm: number | null;
+    capexTtm: number | null;
+    /** Capex as % of revenue, TTM — rising values suppress FCF conversion. */
+    capexPctRevenueTtm: number | null;
   };
   /** Trailing-twelve-month absolutes — inputs for scenario anchor math (§8). */
   ttm: {
@@ -152,6 +155,12 @@ export function computeMetrics(series: FactsByConcept): ComputedMetrics {
     cashFlow: {
       fcfLatestQ: fcfLatest ? { value: fcfLatest.val, accn: fcfLatest.accn } : null,
       cfoTtm,
+      capexTtm: ttm(capex),
+      capexPctRevenueTtm: (() => {
+        const capexT = ttm(capex);
+        const revT = ttm(rev);
+        return capexT !== null && revT !== null && revT > 0 ? round1((capexT / revT) * 100) : null;
+      })(),
     },
     ttm: {
       revenue: ttm(rev),
