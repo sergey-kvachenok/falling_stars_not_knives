@@ -29,9 +29,28 @@ export function historicalMultipleRanges(
   m: ComputedMetrics,
   facts: FactsByConcept,
 ): MultipleRange[] {
-  const shares = m.dilution.sharesOutstanding?.value;
-  if (!shares || shares <= 0 || closes.length === 0) return [];
-  const netDebt = m.balance.netDebt ?? 0;
+  const sharesNow = m.dilution.sharesOutstanding?.value;
+  if (!sharesNow || sharesNow <= 0 || closes.length === 0) return [];
+  const netDebtNow = m.balance.netDebt ?? 0;
+
+  // Time-correct share count and net debt: using TODAY's shares at historical
+  // prices inflates the historical market cap of heavy diluters, making their
+  // historical multiples look higher and today's look "cheap" by comparison.
+  const sharesInstant = facts["sharesOutstanding"]?.instant ?? [];
+  const weightedQ = facts["weightedSharesDiluted"]?.quarterly ?? [];
+  const inst = (name: string) => facts[name]?.instant ?? [];
+  const sharesAt = (end: string): number =>
+    nearestInstant(sharesInstant, end) ??
+    nearestInstant(weightedQ.map((q) => ({ end: q.end, val: q.val })), end) ??
+    sharesNow;
+  const netDebtAt = (end: string): number => {
+    const ltd = nearestInstant(inst("longTermDebt"), end);
+    const cd = nearestInstant(inst("currentDebt"), end);
+    const cash = nearestInstant(inst("cash"), end);
+    const sti = nearestInstant(inst("shortTermInvestments"), end);
+    if (ltd === null && cash === null) return netDebtNow; // no balance history — fall back
+    return (ltd ?? 0) + (cd ?? 0) - (cash ?? 0) - (sti ?? 0);
+  };
 
   const q = (name: string): QuarterPoint[] => facts[name]?.quarterly ?? [];
   const fcfQ = subtractAligned(q("cfo"), q("capex"));
@@ -51,7 +70,7 @@ export function historicalMultipleRanges(
       if (point.ttm <= 0) continue; // negative denominators make no multiple
       const close = nearestClose(closes, point.end);
       if (close === null) continue;
-      const value = close * shares + (def.ev ? netDebt : 0);
+      const value = close * sharesAt(point.end) + (def.ev ? netDebtAt(point.end) : 0);
       ratios.push(value / point.ttm);
     }
     if (ratios.length >= 4) {
@@ -95,6 +114,24 @@ export function ttmSeries(pts: QuarterPoint[]): { end: string; ttm: number }[] {
     out.push({ end: pts[i]!.end, ttm: pts.slice(i - 3, i + 1).reduce((s, p) => s + p.val, 0) });
   }
   return out;
+}
+
+function nearestInstant(
+  pts: { end: string; val: number }[],
+  date: string,
+  maxDays = 135,
+): number | null {
+  const target = Date.parse(date);
+  let best: number | null = null;
+  let bestDist = maxDays * 86_400_000;
+  for (const p of pts) {
+    const dist = Math.abs(Date.parse(p.end) - target);
+    if (dist < bestDist) {
+      best = p.val;
+      bestDist = dist;
+    }
+  }
+  return best;
 }
 
 function nearestClose(closes: Bar[], date: string): number | null {

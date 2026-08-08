@@ -36,3 +36,41 @@ test("historical ranges computed from closes × shares over TTM revenue", () => 
   assert.equal(evs.n, 5);
   assert.equal(evs.p50, 3); // multiples: 1.5, 2, 3, 4, 5 → median 3
 });
+
+test("historical EV uses the share count OF THAT TIME, not today's", () => {
+  // Heavy diluter: 50 shares historically, 100 today. Same $8 close at the
+  // 2025-06-30 TTM end must produce cap 400 (not 800) → multiple 1, not 2.
+  const rev = ["2024-06-30", "2024-09-30", "2024-12-31", "2025-03-31", "2025-06-30", "2025-09-30", "2025-12-31", "2026-03-31"].map((d) => q(d, 100));
+  const facts = {
+    revenue: { concept: "revenue", tag: "Revenues", quarterly: rev, annual: [], instant: [] },
+    sharesOutstanding: {
+      concept: "sharesOutstanding",
+      tag: "EntityCommonStockSharesOutstanding",
+      quarterly: [],
+      annual: [],
+      instant: [
+        { end: "2025-06-30", val: 50, accn: "a" },
+        { end: "2026-03-31", val: 100, accn: "a" },
+      ],
+    },
+  } as unknown as FactsByConcept;
+  const metrics = {
+    dilution: { sharesOutstanding: { value: 100, accn: "a" }, yoyChangePct: null },
+    balance: { netDebt: 0 },
+  } as unknown as ComputedMetrics;
+  const ranges = historicalMultipleRanges(
+    [
+      { date: "2025-06-30", close: 8 },
+      { date: "2025-09-30", close: 8 },
+      { date: "2025-12-31", close: 8 },
+      { date: "2026-03-31", close: 8 },
+      { date: "2025-03-31", close: 8 },
+    ],
+    metrics,
+    facts,
+  );
+  const evs = ranges.find((r) => r.metric === "EV/Sales")!;
+  // At 2025-06-30 shares≈50 → 8×50/400 = 1; at 2026-03-31 shares=100 → 2.
+  assert.ok(evs.p25 < 1.5, `p25 ${evs.p25} should reflect the historical (smaller) share count`);
+  assert.ok(evs.p75 >= 1.5, `p75 ${evs.p75} should reflect today's diluted count`);
+});

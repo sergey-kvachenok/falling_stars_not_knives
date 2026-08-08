@@ -36,10 +36,11 @@ names never reach the digest.
 ## 2. Market context — data, not judgment
 
 - **Historical multiple ranges** (`src/compute/multiples.ts`): for each of the last ~6–10
-  quarter-ends, `EV_t = close_t × shares_now + netDebt_now`, then
-  `multiple_t = EV_t / TTM-metric_t` (or market cap for P/E, P/FCF). Reported as the
-  25th/50th/75th percentile of the company's OWN trading history (needs ≥4 observations).
-  *Known approximation: current shares and net debt at every historical point.*
+  quarter-ends, `EV_t = close_t × shares_t + netDebt_t` — shares and net debt are taken
+  **from the XBRL series of that quarter**, not today's (today's share count at historical
+  prices would inflate the historical caps of heavy diluters, making today look falsely
+  cheap). Reported as the 25th/50th/75th percentile of the company's OWN trading history
+  (needs ≥4 observations); falls back to current values only where the series is missing.
 - **Current multiples**: the same arithmetic at today's price — what the market pays now,
   post-drop. The gap between history and today is the re-rating.
 - **Street data** (Yahoo): consensus price target, and next-fiscal-year revenue estimate.
@@ -68,7 +69,16 @@ marketCap = Σ_{t=1..N} FCF₀(1+g)^t / (1+r)^t  +  FCF₀(1+g)^N (1+g_T) / ((r�
 **Expectations gap** = conservative street growth − market-implied growth, where street
 growth = **min(forward revenue growth, forward EPS growth)** — the bottom-line estimate
 embeds margin change, keeping the comparison with implied FCF growth apples-to-apples
-(revenue growth alone overstates cash growth when margins won't scale).
+(revenue growth alone overstates cash growth when margins won't scale). EPS growth is
+incomputable for unprofitable companies (negative denominator); rather than silently
+falling back to revenue — the original trap — **unprofitable names without a bottom-line
+estimate take a 50% haircut on revenue growth**, and the proxy used is recorded.
+
+Known limitations, monitored rather than solved: GAAP expenses R&D immediately, which
+depresses ROIC for research-heavy compounders vs capex-heavy industrials; and the stacked
+gates (quality + 20% discount + expectations gap + ROIC) may over-tighten — if weeks pass
+with zero qualifiers, revisit `requiredDiscountToFair` before concluding the market has
+no mispricings.
 
 ## 4. AI scenarios — judgment, fenced by validation
 

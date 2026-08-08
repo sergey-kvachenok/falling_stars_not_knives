@@ -29,15 +29,18 @@ export interface EconomicView {
   streetGrowthPct: number | null;
   /** streetGrowthPct − impliedGrowthPct: positive = market more pessimistic than the street. */
   expectationsGapPts: number | null;
-  /** Risk-tiered discount rate actually used (%, e.g. 12 for risky names). */
+  /** Risk-tiered discount rate actually used (%, e.g. 14 for stacked-risk names). */
   discountRatePctUsed: number;
   /** Return on invested capital, TTM — growth destroys value when below the discount rate. */
   roicPct: number | null;
+  /** Which street growth proxy fed the gap — "revenue-penalized" marks unprofitable names without a bottom-line estimate. */
+  growthProxy: string | null;
 }
 
 /**
  * A flat discount rate treats a leveraged small-cap like a mega-cap
- * compounder. Deterministic tiers: base rate ±2pts on visible risk markers.
+ * compounder. Risk markers STACK (+2pts each, capped): a cash-burning
+ * leveraged micro-cap is not merely "risky", it is all three at once.
  */
 export function riskAdjustedDiscountRate(price: number | null, m: ComputedMetrics): number {
   const base = config.economics.discountRate;
@@ -45,9 +48,11 @@ export function riskAdjustedDiscountRate(price: number | null, m: ComputedMetric
   const mcapB = price && shares ? (price * shares) / 1e9 : null;
   const nde = m.balance?.netDebtToEbitdaTtm ?? null;
   const fcfMarginPct = m.margins?.fcfPct?.latestPct ?? null;
-  const risky =
-    (nde !== null && nde > 1.5) || (fcfMarginPct !== null && fcfMarginPct < 5) || (mcapB !== null && mcapB < 5);
-  if (risky) return base + 0.02;
+  let markers = 0;
+  if (nde !== null && nde > 1.5) markers++;
+  if (fcfMarginPct !== null && fcfMarginPct < 5) markers++;
+  if (mcapB !== null && mcapB < 5) markers++;
+  if (markers > 0) return Math.min(base + 0.02 * markers, config.economics.maxDiscountRate);
   const ebit = m.ttm?.ebit ?? null;
   const stable = mcapB !== null && mcapB > 100 && ebit !== null && ebit > 0 && (nde === null || nde < 1.5);
   return stable ? base - 0.02 : base;
@@ -88,10 +93,24 @@ export function computeEconomicView(
 
   // Apples-to-apples: revenue growth alone overstates cash growth when
   // margins won't scale; take the more conservative of revenue and EPS growth.
+  // EPS growth is incomputable for unprofitable companies (negative
+  // denominator) — falling silently back to revenue would reopen the original
+  // trap, so unprofitable names take a 50% haircut on revenue growth instead.
   const streetRevGrowthPct =
     streetRevenue1yUsd && t.revenue && t.revenue > 0 ? round1((streetRevenue1yUsd / t.revenue - 1) * 100) : null;
-  const candidates = [streetRevGrowthPct, streetEpsGrowthPct].filter((x): x is number => x !== null);
-  const streetGrowthPct = candidates.length > 0 ? Math.min(...candidates) : null;
+  const unprofitable = t.netIncome !== null && t.netIncome <= 0;
+  let streetGrowthPct: number | null = null;
+  let growthProxy: string | null = null;
+  if (streetEpsGrowthPct !== null && streetRevGrowthPct !== null) {
+    streetGrowthPct = Math.min(streetEpsGrowthPct, streetRevGrowthPct);
+    growthProxy = "min(revenue, eps)";
+  } else if (streetEpsGrowthPct !== null) {
+    streetGrowthPct = streetEpsGrowthPct;
+    growthProxy = "eps";
+  } else if (streetRevGrowthPct !== null) {
+    streetGrowthPct = unprofitable ? round1(streetRevGrowthPct * 0.5) : streetRevGrowthPct;
+    growthProxy = unprofitable ? "revenue-penalized (unprofitable, no bottom-line estimate)" : "revenue";
+  }
 
   // ROIC vs cost of capital: growth funded below its cost destroys value.
   let roicPct: number | null = null;
@@ -111,6 +130,7 @@ export function computeEconomicView(
       impliedGrowthPct !== null && streetGrowthPct !== null ? round1(streetGrowthPct - impliedGrowthPct) : null,
     discountRatePctUsed: round1(discountRate * 100),
     roicPct,
+    growthProxy,
   };
 }
 

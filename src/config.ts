@@ -50,6 +50,9 @@ export const config = {
   economics: {
     // Standard textbook defaults — arguable, therefore visible and adjustable.
     discountRate: 0.1,
+    // Risk markers stack +2pts each up to this ceiling (distressed names
+    // deserve 14-16%, not a polite 12%).
+    maxDiscountRate: 0.16,
     terminalGrowth: 0.025,
     taxRate: 0.21,
     fadeYears: 10,

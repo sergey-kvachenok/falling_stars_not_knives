@@ -55,15 +55,28 @@ test("ROIC computed from NOPAT over invested capital", () => {
 test("street growth takes the conservative min of revenue and EPS growth", () => {
   const v = computeEconomicView(50, metrics(), 11_200_000_000, 4); // rev +12%, eps +4%
   assert.equal(v.streetGrowthPct, 4);
+  assert.equal(v.growthProxy, "min(revenue, eps)");
 });
 
-test("risk tiers move the discount rate", () => {
+test("unprofitable + no EPS estimate → revenue growth halved, not trusted", () => {
+  const m = metrics();
+  (m.ttm as { netIncome: number | null }).netIncome = -200_000_000;
+  const v = computeEconomicView(50, m, 11_200_000_000, null); // rev +12%, no eps
+  assert.equal(v.streetGrowthPct, 6); // 12 × 0.5
+  assert.ok(v.growthProxy!.includes("penalized"));
+});
+
+test("risk tiers move the discount rate, and markers stack", () => {
   // default metrics: $50 × 100M = $5B cap, fcf margin 10 → base 10%
   assert.equal(computeEconomicView(50, metrics(), null).discountRatePctUsed, 10);
   // mega-cap, profitable, low leverage → 8%
   assert.equal(computeEconomicView(1_500, metrics(), null).discountRatePctUsed, 8);
   // small cap (<$5B) → 12%
   assert.equal(computeEconomicView(20, metrics(), null).discountRatePctUsed, 12);
+  // small cap + thin FCF margin → penalties stack to 14%
+  const risky = metrics();
+  (risky.margins as { fcfPct: { latestPct: number } }).fcfPct.latestPct = 2;
+  assert.equal(computeEconomicView(20, risky, null).discountRatePctUsed, 14);
 });
 
 test("no positive FCF → implied growth incomputable; EPV falls back through EBIT", () => {
