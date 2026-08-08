@@ -35,6 +35,12 @@ export interface Prediction {
   /** Valuation at record time — calibration inputs (improvement #4). */
   fairValue1y?: number | null;
   implied1y?: { bear: number | null; base: number | null; bull: number | null };
+  /** Everything needed to audit the decision later (Loop 3 verification). */
+  undervaluationPct?: number | null;
+  economics?: import("../compute/economics.js").EconomicView;
+  promptVersion?: number;
+  /** Fair value after calibration adjustment, when the correction was active. */
+  fairValue1yAdjusted?: number | null;
   /** Realized-vs-fair error at 1y, percent; filled by the scoring job. */
   valuationErrorPct?: number | null;
   // Filled in by the scoring job as the prediction ages:

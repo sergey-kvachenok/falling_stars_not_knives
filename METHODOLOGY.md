@@ -135,12 +135,23 @@ recommended entry           = fair value × (1 − 20%)                  (requir
 
 At most 5 names; zero qualifiers sends an explicit empty-list message with per-name reasons.
 
-## 7. Accountability
+## 7. Accountability and self-calibration (Loop 3 — wired)
 
-Every prediction stores its fair value, scenario band, and reference price. The weekly
-scoring job grades: kill-switches at 90 days (fired/survived/uncheckable), drift vs SPY per
-drop-class at 30/90 days, and at 1 year the realized-vs-fair error — the measured bias is
-reported in Sunday rollups and accumulates toward a display correction.
+Every prediction stores the complete audit trail: fair value (raw and calibration-adjusted),
+the bear–bull band, reference price, undervaluation %, the full economic view (implied
+growth, gap, EPV, discount rate used), classification, and the prompt version that produced
+it. The weekly scoring job grades: kill-switches at 90 days (fired/survived/uncheckable),
+drift vs SPY per drop-class at 30/90 days, and at 1 year the realized-vs-fair error.
+
+The measured bias (mean/median error, per-classification breakdown) persists to the
+`calibration` state. **Once `calibration.minSamples` (20) predictions have matured, the
+correction activates automatically**: displayed fair values, recommended entries, and the
+digest gate itself all use `fair × (1 + meanError)`, clamped to ×0.5–×1.5, and every
+corrected number is labeled with the sample count. Until then the bias is reported but not
+applied — correcting from a handful of samples would be fitting noise.
+
+`npm run verify` prints the full ledger — every prediction, what was claimed, on what
+economics, and what actually happened — plus the current calibration status.
 
 ## Worked example (RBLX, 2026-08-08, $36.57 — with all corrections applied)
 

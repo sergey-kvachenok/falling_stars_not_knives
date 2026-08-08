@@ -274,6 +274,7 @@ async function main() {
         analysis: e.analysis,
         justification: r.justification,
         fairValue: e.gate.fairValue,
+        fairValueAdjusted: e.gate.fairValueAdjusted,
         undervaluationPct: e.gate.undervaluationPct,
       };
       if (seenNote) entry.seenNote = seenNote;
@@ -320,6 +321,10 @@ async function main() {
       scenarios: e.analysis.verdict!.scenarios,
       snapshot: takeSnapshot(e.bundle),
       fairValue1y: e.fairValue ?? null,
+      fairValue1yAdjusted: e.fairValueAdjusted ?? null,
+      undervaluationPct: e.undervaluationPct ?? null,
+      ...(e.bundle.drop?.economics ? { economics: e.bundle.drop.economics } : {}),
+      promptVersion: config.llm.promptVersion,
       implied1y: Object.fromEntries(
         (["bear", "base", "bull"] as const).map((cs) => {
           const s = e.analysis.verdict!.scenarios.find((x) => x.horizonYears === "1" && x.scenarioCase === cs);

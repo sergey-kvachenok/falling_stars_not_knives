@@ -20,6 +20,7 @@ export interface DigestEntry {
   justification: string;
   seenNote?: string; // "seen 2026-08-07 👍" — bot memory marker
   fairValue?: number | null; // blended 1y anchor, set by the digest gate
+  fairValueAdjusted?: number | null; // calibration-corrected, when Loop 3 is active
   undervaluationPct?: number | null;
 }
 
@@ -49,6 +50,8 @@ export function buildDigest(
         })
         .join(" / ");
     const fair = e.fairValue ?? null;
+    const effectiveFair = e.fairValueAdjusted ?? fair;
+    const calNote = e.fairValueAdjusted != null ? ` → ${$p(e.fairValueAdjusted)} after calibration` : "";
     const underv = e.undervaluationPct != null ? ` (undervalued ${e.undervaluationPct.toFixed(0)}%)` : "";
     const seen = e.seenNote ? ` · <i>${esc(e.seenNote)}</i>` : "";
     const moat = v ? ` · moat: ${esc(v.moat.assessment)}` : "";
@@ -64,11 +67,11 @@ export function buildDigest(
     lines.push(
       `${i + 1}. <b>${esc(e.ticker)}</b> — ${esc(truncate(e.bundle.company.name, 30))}${moat}${seen}\n` +
         `current price: ${$p(price)}\n` +
-        `ai fair value: <b>${$p(fair)}</b>${underv}${ecoLine}\n` +
+        `ai fair value: <b>${$p(fair)}</b>${calNote}${underv}${ecoLine}\n` +
         `ai target 1y: ${target("1")}\n` +
         `ai target 3y: ${target("3")}\n` +
         `analyst consensus: ${$p(drop?.analystTargetPrice ?? null)}\n` +
-        `recommended entry price: ≤ <b>${$p(fair !== null ? Math.round(fair * entryFactor * 100) / 100 : null)}</b>` +
+        `recommended entry price: ≤ <b>${$p(effectiveFair !== null ? Math.round(effectiveFair * entryFactor * 100) / 100 : null)}</b>` +
         `${change}${anomaly}\n` +
         `<i>${esc(truncate(v?.oneLineThesis ?? e.justification, 140))}</i>`,
     );

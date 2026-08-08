@@ -63,6 +63,15 @@ export const config = {
     // revenue growth × this. Blunt by design — EPS growth is always preferred.
     unprofitableRevenueHaircut: 0.5,
   },
+  calibration: {
+    // Loop 3: measured fair-value bias starts correcting displayed/gated
+    // values once this many predictions have matured to their 1y grading.
+    minSamples: 20,
+    // Safety clamp on the correction factor — a measured bias beyond ±50%
+    // means something is broken, not that we should multiply by it.
+    minAdjustFactor: 0.5,
+    maxAdjustFactor: 1.5,
+  },
   quality: {
     // Deterministic health gates — a name failing any is excluded (logged).
     maxNetDebtToEbitda: 2.5, // ignored when net debt ≤ 0; ratio only exists when EBITDA > 0

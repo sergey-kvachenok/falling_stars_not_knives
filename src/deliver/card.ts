@@ -1,4 +1,5 @@
 import { entryPrice, impliedPrice, weightedAnchorPrice } from "../compute/anchors.js";
+import { adjustFairValue, loadCalibration } from "../compute/calibration.js";
 import { config } from "../config.js";
 import type { CardRow } from "../lib/db.js";
 import type { DigestEntry } from "./report.js";
@@ -32,14 +33,17 @@ export function buildExpandedCard(e: DigestEntry): CardRow {
     const street = e.bundle.drop?.analystTargetPrice ?? null;
     const discount =
       refPrice && weightedAnchor1y ? ` (${pctVs(refPrice, weightedAnchor1y)} vs fair)` : "";
+    const adj = weightedAnchor1y !== null ? adjustFairValue(weightedAnchor1y, loadCalibration()) : null;
+    const fairForEntry = adj?.active ? adj.adjusted : weightedAnchor1y;
     const entryRec =
-      weightedAnchor1y !== null
-        ? Math.round(weightedAnchor1y * (1 - config.valuation.requiredDiscountToFair) * 100) / 100
+      fairForEntry !== null
+        ? Math.round(fairForEntry * (1 - config.valuation.requiredDiscountToFair) * 100) / 100
         : null;
     const eco = e.bundle.drop?.economics;
     parts.push(
       `\n💰 <b>Valuation</b>`,
-      `AI fair value (blended 1y anchor): <b>${$(weightedAnchor1y)}</b>`,
+      `AI fair value (blended 1y anchor): <b>${$(weightedAnchor1y)}</b>` +
+        (adj?.active ? ` → <b>${$(adj.adjusted)}</b> after calibration (n=${adj.n})` : ""),
       `analyst consensus: ${$(street)}`,
       `recommended entry price: ≤ <b>${$(entryRec)}</b>`,
       `price at analysis: ${$(refPrice)}${discount}`,

@@ -4,14 +4,15 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node --import tsx --test src/edgar/companyfacts.test.ts src/compute/sanity.test.ts src/compute/anchors.test.ts src/compute/quality.test.ts src/compute/multiples.test.ts src/compute/economics.test.ts src/analyst/validate.test.ts",
+    "test": "node --import tsx --test src/edgar/companyfacts.test.ts src/compute/sanity.test.ts src/compute/anchors.test.ts src/compute/quality.test.ts src/compute/multiples.test.ts src/compute/economics.test.ts src/compute/calibration.test.ts src/analyst/validate.test.ts",
     "screen": "tsx src/screen/run.ts",
     "typecheck": "tsc --noEmit",
     "bundle": "tsx src/bundle/run.ts",
     "analyze": "tsx src/analyst/run.ts",
     "pipeline": "tsx src/pipeline/run.ts",
     "score": "tsx src/scoring/run.ts",
-    "webhook": "tsx src/deliver/webhook-setup.ts"
+    "webhook": "tsx src/deliver/webhook-setup.ts",
+    "verify": "tsx src/scoring/report.ts"
   },
   "keywords": [],
   "author": "",

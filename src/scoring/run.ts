@@ -125,6 +125,15 @@ async function main() {
   let calibrationLine = "";
   if (calibrated.length > 0) {
     const meanErr = avg(calibrated.map((p) => p.valuationErrorPct!));
+    const sortedErrs = calibrated.map((p) => p.valuationErrorPct!).sort((a, b) => a - b);
+    const medianErr = sortedErrs[Math.floor(sortedErrs.length / 2)]!;
+    const byClassification: Record<string, { n: number; meanErrorPct: number }> = {};
+    for (const p of calibrated) {
+      const cls = p.classification;
+      const bucket = (byClassification[cls] ??= { n: 0, meanErrorPct: 0 });
+      bucket.meanErrorPct = (bucket.meanErrorPct * bucket.n + p.valuationErrorPct!) / (bucket.n + 1);
+      bucket.n++;
+    }
     const inBand = calibrated.filter((p) => {
       const realized = p.refPrice * (1 + (p.return1y ?? 0));
       return p.implied1y?.bear != null && p.implied1y?.bull != null
@@ -135,7 +144,13 @@ async function main() {
       `valuation calibration (n=${calibrated.length}): realized ${meanErr > 0 ? "+" : ""}${meanErr.toFixed(0)}% vs fair on average; ` +
       `${inBand}/${calibrated.length} landed inside the bear–bull band`;
     const { writeState } = await import("../lib/state.js");
-    writeState("calibration", { n: calibrated.length, meanErrorPct: Math.round(meanErr * 10) / 10, updatedAt: today });
+    writeState("calibration", {
+      n: calibrated.length,
+      meanErrorPct: Math.round(meanErr * 10) / 10,
+      medianErrorPct: Math.round(medianErr * 10) / 10,
+      byClassification,
+      updatedAt: today,
+    });
   }
 
   const summary = [
