@@ -135,15 +135,21 @@ async function main() {
       }
       // Empirical valuation anchors: the company's own multiple history and
       // the street's forward revenue — both bound the AI's assumptions.
-      const { getMonthlyCloses, getForwardRevenue } = await import("../screen/quotes.js");
-      const [closes, streetRev] = await Promise.all([getMonthlyCloses(c.ticker), getForwardRevenue(c.ticker)]);
-      const { historicalMultipleRanges } = await import("../compute/multiples.js");
+      const { getMonthlyCloses, getForwardRevenue, getAnalystTarget } = await import("../screen/quotes.js");
+      const [closes, streetRev, streetTarget] = await Promise.all([
+        getMonthlyCloses(c.ticker),
+        getForwardRevenue(c.ticker),
+        getAnalystTarget(c.ticker),
+      ]);
+      const { historicalMultipleRanges, currentMultiples } = await import("../compute/multiples.js");
       bundle.drop!.multipleRanges = historicalMultipleRanges(
         closes,
         bundle.metrics,
         bundle.facts as Parameters<typeof historicalMultipleRanges>[2],
       );
+      bundle.drop!.currentMultiples = currentMultiples(c.price, bundle.metrics);
       bundle.drop!.streetRevenue1yUsd = streetRev;
+      bundle.drop!.analystTargetPrice = streetTarget;
 
       const { record, cacheHit } = await analyzeWithCache(bundle);
       if (cacheHit) cacheHits++;
@@ -272,13 +278,6 @@ async function main() {
     })
     .filter((x): x is DigestEntry => x !== null);
 
-  // Street consensus for the digest lines (per-symbol module, ≤5 calls).
-  const { getAnalystTarget } = await import("../screen/quotes.js");
-  for (const e of digestEntries) {
-    if (e.bundle.drop && e.bundle.drop.analystTargetPrice == null) {
-      e.bundle.drop.analystTargetPrice = await getAnalystTarget(e.ticker);
-    }
-  }
 
   // 6. Deliver.
   const digest = buildDigest(digestEntries, runDate, stable, watchlist);

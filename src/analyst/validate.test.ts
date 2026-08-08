@@ -74,6 +74,26 @@ test("reconciliation without a verbatim quote is rejected", () => {
   assert.ok(r.problems.some((p) => p.includes("verbatim")));
 });
 
+test("a bear case far above the current price is rejected", () => {
+  const metrics = {
+    dilution: { sharesOutstanding: { value: 100_000_000, accn: "a" }, yoyChangePct: null },
+    balance: { netDebt: 0 },
+    ttm: { revenue: null, ebitda: null, netIncome: null, fcf: null },
+  } as unknown as import("../compute/metrics.js").ComputedMetrics;
+  const v = goodVerdict(); // all anchors 10× $1B = $100/share
+  const r = validateVerdict(v, VALID, metrics, { price: 50 }); // bear implies +100%
+  assert.ok(r.problems.some((p) => p.includes("ABOVE the current")), r.problems.join(";"));
+  const ok = validateVerdict(v, VALID, metrics, { price: 95 }); // within 1.15× — fine
+  assert.ok(!ok.problems.some((p) => p.includes("ABOVE the current")));
+});
+
+test("scenario weights must sum to ~1 per horizon", () => {
+  const v = goodVerdict();
+  for (const s of v.scenarios) if (s.horizonYears === "1") s.narrativeWeight = 0.6; // sums to 1.8
+  const r = validateVerdict(v, VALID);
+  assert.ok(r.problems.some((p) => p.includes("weights sum")), r.problems.join(";"));
+});
+
 test("incoherent 1y-vs-3y trajectory is rejected when metrics allow pricing", () => {
   const metrics = {
     dilution: { sharesOutstanding: { value: 100_000_000, accn: "a" }, yoyChangePct: null },

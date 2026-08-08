@@ -58,12 +58,21 @@ export function buildAnalystPrompt(bundle: TickerBundle, opts: PromptOpts = {}):
   const name = opts.anonymize ? "Company A" : `${bundle.ticker} (${bundle.company.name})`;
 
   const ranges = bundle.drop?.multipleRanges ?? [];
+  const current = bundle.drop?.currentMultiples ?? [];
+  const currentByMetric = new Map(current.map((c) => [c.metric, c.value]));
   const rangesSection =
     ranges.length > 0
-      ? `\nHISTORICAL MULTIPLE RANGES (computed from this company's own trading history; current
-shares/net debt approximation):\n${ranges
-          .map((r) => `  - ${r.metric}: p25 ${r.p25} / median ${r.p50} / p75 ${r.p75} (n=${r.n} quarter-ends)`)
-          .join("\n")}\n`
+      ? `\nHISTORICAL MULTIPLE RANGES vs TODAY (current shares/net debt approximation):\n${ranges
+          .map(
+            (r) =>
+              `  - ${r.metric}: p25 ${r.p25} / median ${r.p50} / p75 ${r.p75} (n=${r.n})` +
+              (currentByMetric.has(r.metric) ? ` — MARKET PAYS TODAY: ${currentByMetric.get(r.metric)}` : ""),
+          )
+          .join("\n")}
+The gap between history and today IS the re-rating the market just applied — it is information,
+not an error to fade. Bear multiples belong AT OR BELOW today's multiple; base between today
+and the historical median requires naming what specifically recovers; bull near historical
+median-to-p75 requires strong filed evidence.\n`
       : "";
   const streetSection =
     bundle.drop?.streetRevenue1yUsd != null

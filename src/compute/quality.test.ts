@@ -68,6 +68,13 @@ test("negative free cash flow fails", () => {
   assert.ok(g.reasons.some((r) => r.includes("free cash flow")));
 });
 
+test("fair value far above street target fails the winner's-curse guard", () => {
+  const b = bundle({ price: 50 });
+  b.drop!.analystTargetPrice = 40; // fair $100 = 2.5× street
+  const g = digestGate(b, verdict());
+  assert.ok(g.reasons.some((r) => r.includes("street target")), g.reasons.join(";"));
+});
+
 test("no moat fails; degraded metrics fail", () => {
   assert.ok(digestGate(bundle(), verdict("none")).reasons.some((r) => r.startsWith("moat")));
   assert.ok(digestGate(bundle({ sanity: "degraded" }), verdict()).reasons.some((r) => r.includes("degraded")));

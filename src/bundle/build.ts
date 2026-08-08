@@ -30,6 +30,8 @@ export interface TickerBundle {
     triggers?: string[];
     /** Company's own historical multiple percentiles — bounds the AI's multiples. */
     multipleRanges?: import("../compute/multiples.js").MultipleRange[];
+    /** What the market pays today, post-drop — the live re-rating. */
+    currentMultiples?: { metric: string; value: number }[];
     /** Street next-FY revenue consensus — anchors assumed values. */
     streetRevenue1yUsd?: number | null;
   };

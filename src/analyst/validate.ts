@@ -113,6 +113,28 @@ export function validateVerdict(
     }
   }
 
+  // Bear realism: a bear case above today's price claims riskless upside.
+  // The market's price IS a plausible bear for a just-crashed stock.
+  const price = drop?.price;
+  if (metrics && price && !v.insufficientEvidence) {
+    const bear1 = v.scenarios.find((s) => s.horizonYears === "1" && s.scenarioCase === "bear");
+    const bearImplied = bear1 ? impliedPrice(bear1.valuationAnchor, metrics) : null;
+    if (bearImplied !== null && bearImplied > price * 1.15) {
+      problems.push(
+        `1y bear implies $${bearImplied} — ${Math.round((bearImplied / price - 1) * 100)}% ABOVE the current $${price.toFixed(2)}. ` +
+          `A bear case must be genuinely bearish: multiple at or below today's, fundamentals missing expectations.`,
+      );
+    }
+  }
+
+  // Narrative weights must be a distribution, not free-floating enthusiasm.
+  for (const h of ["1", "3"] as const) {
+    const sum = v.scenarios.filter((s) => s.horizonYears === h).reduce((a, s) => a + s.narrativeWeight, 0);
+    if (sum < 0.85 || sum > 1.15) {
+      problems.push(`${h}y scenario weights sum to ${sum.toFixed(2)} — they must sum to ~1.0`);
+    }
+  }
+
   // Cross-horizon coherence: the 1y and 3y paths must describe the same
   // company. Metric-switching (EV/Sales at 1y, P/E on early earnings at 3y)
   // produced a 3y base at a third of the 1y base — each plausible alone,

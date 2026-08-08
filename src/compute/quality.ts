@@ -61,6 +61,15 @@ export function digestGate(bundle: TickerBundle, verdict: Verdict | null): GateR
     reasons.push(`moat: ${verdict.moat?.assessment ?? "missing"}`);
   }
 
+  // Winner's-curse guard: when our fair value dwarfs the street's, the
+  // likeliest explanation is our assumptions, not a market-wide blind spot.
+  const street = bundle.drop?.analystTargetPrice;
+  if (fairValue !== null && street && street > 0 && fairValue > street * 1.75) {
+    reasons.push(
+      `AI fair value $${fairValue} is ${(fairValue / street).toFixed(1)}× the street target $${street} — optimism unsupported by consensus`,
+    );
+  }
+
   // Degraded metrics can't certify health.
   if (bundle.sanity.confidence === "degraded") reasons.push("metrics confidence degraded");
 

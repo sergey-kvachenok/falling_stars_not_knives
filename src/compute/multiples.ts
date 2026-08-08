@@ -68,6 +68,26 @@ export function historicalMultipleRanges(
   return ranges;
 }
 
+/**
+ * The multiples the market pays TODAY, post-drop — the live re-rating is
+ * information the model must confront: bear multiples belong at or below it.
+ */
+export function currentMultiples(price: number, m: ComputedMetrics): { metric: MultipleRange["metric"]; value: number }[] {
+  const shares = m.dilution.sharesOutstanding?.value;
+  if (!shares || shares <= 0 || price <= 0) return [];
+  const netDebt = m.balance.netDebt ?? 0;
+  const cap = price * shares;
+  const out: { metric: MultipleRange["metric"]; value: number }[] = [];
+  const push = (metric: MultipleRange["metric"], denom: number | null, ev: boolean) => {
+    if (denom !== null && denom > 0) out.push({ metric, value: Math.round(((cap + (ev ? netDebt : 0)) / denom) * 10) / 10 });
+  };
+  push("EV/Sales", m.ttm.revenue, true);
+  push("EV/EBITDA", m.ttm.ebitda, true);
+  push("P/E", m.ttm.netIncome, false);
+  push("P/FCF", m.ttm.fcf, false);
+  return out;
+}
+
 /** Trailing-four-quarter sums at each quarter end. */
 export function ttmSeries(pts: QuarterPoint[]): { end: string; ttm: number }[] {
   const out: { end: string; ttm: number }[] = [];
