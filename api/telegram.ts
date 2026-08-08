@@ -163,6 +163,13 @@ async function processArgument(msg: TgMessage): Promise<void> {
       ticker = ctx?.ticker;
     }
     if (!ticker) {
+      // No stored context (e.g. it predates this feature) — continue the most
+      // recently argued ticker from the log itself.
+      const [last] = await sql<{ ticker: string }[]>`
+        SELECT ticker FROM user_arguments WHERE created_at > now() - interval '24 hours' ORDER BY created_at DESC LIMIT 1`;
+      ticker = last?.ticker;
+    }
+    if (!ticker) {
       await tg("sendMessage", {
         chat_id: chatId,
         text: `I couldn't match a ticker I've analyzed (and no recent conversation to continue). Mention it explicitly. Known: ${[...known].sort().join(", ")}`,
