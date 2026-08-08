@@ -140,6 +140,11 @@ async function processArgument(msg: TgMessage): Promise<void> {
   const text = msg.text!;
   const sql = postgres(process.env.DATABASE_URL!, { max: 1, connect_timeout: 15, onnotice: () => {} });
   try {
+    await sql`CREATE TABLE IF NOT EXISTS user_arguments (
+      id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      ticker text NOT NULL, user_text text NOT NULL, ai_reply text NOT NULL,
+      standing text NOT NULL, distilled_note text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now())`;
     // Which ticker? Match uppercase tokens against companies we actually know.
     const known = new Set(
       (await sql<{ ticker: string }[]>`SELECT ticker FROM performance UNION SELECT ticker FROM cards`).map(
@@ -219,9 +224,7 @@ READER'S ARGUMENT: "${text.slice(0, 1500)}"`;
     if (!raw) throw new Error(data.error?.message ?? "no model output");
     const out = JSON.parse(raw) as { reply: string; standing: string; distilledNote: string };
 
-    await sql`INSERT INTO user_arguments (ticker, user_text, ai_reply, standing, distilled_note)
-              VALUES (${ticker}, ${text.slice(0, 2000)}, ${out.reply.slice(0, 3000)}, ${out.standing}, ${out.distilledNote.slice(0, 500)})`;
-
+    // Reply FIRST — a storage hiccup must never eat the answer.
     const badge = out.standing === "concede_update" ? "🔄 conceded" : out.standing === "partial" ? "⚖️ partially accepted" : "🛡 holding";
     const escT = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     await tg("sendMessage", {
@@ -231,6 +234,8 @@ READER'S ARGUMENT: "${text.slice(0, 1500)}"`;
         `💬 <b>${ticker}</b> — ${badge}\n\n${escT(out.reply)}\n\n` +
         `<i>Logged: "${escT(out.distilledNote)}" — every future analysis of ${ticker} must address this.</i>`,
     });
+    await sql`INSERT INTO user_arguments (ticker, user_text, ai_reply, standing, distilled_note)
+              VALUES (${ticker}, ${text.slice(0, 2000)}, ${out.reply.slice(0, 3000)}, ${out.standing}, ${out.distilledNote.slice(0, 500)})`;
   } finally {
     await sql.end();
   }
