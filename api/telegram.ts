@@ -59,7 +59,18 @@ export async function GET(request: Request): Promise<Response> {
   const diag: Record<string, unknown> = {
     tokenSet: Boolean(process.env.TELEGRAM_BOT_TOKEN),
     dbSet: Boolean(process.env.DATABASE_URL),
+    geminiSet: Boolean(process.env.GEMINI_API_KEY),
   };
+  if (process.env.GEMINI_API_KEY) {
+    try {
+      const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1", {
+        headers: { "x-goog-api-key": process.env.GEMINI_API_KEY },
+      });
+      diag.gemini = r.ok ? "ok" : `FAIL: HTTP ${r.status}`;
+    } catch (err) {
+      diag.gemini = `THREW: ${(err as Error).message}`;
+    }
+  }
   if (process.env.TELEGRAM_BOT_TOKEN) {
     try {
       const res = await fetch(api("getMe"));
