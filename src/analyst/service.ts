@@ -15,10 +15,17 @@ export interface AnalyzeOutcome {
 
 export async function analyzeWithCache(
   bundle: TickerBundle,
-  opts: { anonymize?: boolean; force?: boolean } = {},
+  opts: {
+    anonymize?: boolean;
+    force?: boolean;
+    objections?: import("../lib/db.js").UserArgument[];
+  } = {},
 ): Promise<AnalyzeOutcome> {
   mkdirSync(ANALYSES_DIR, { recursive: true });
-  const hash = bundleHash(bundle);
+  // A new reader objection busts the cache: the ticker gets re-analyzed even
+  // without a new filing, because the analysis contract changed.
+  const objectionKey = (opts.objections ?? []).map((o) => o.distilledNote).join("|");
+  const hash = bundleHash(bundle, objectionKey);
   const cachePath = `${ANALYSES_DIR}/${bundle.ticker}-${hash}${opts.anonymize ? "-anon" : ""}.json`;
   if (!opts.force && existsSync(cachePath)) {
     return { record: JSON.parse(readFileSync(cachePath, "utf8")) as AnalysisRecord, cacheHit: true };

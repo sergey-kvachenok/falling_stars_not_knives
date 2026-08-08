@@ -66,6 +66,8 @@ export interface PromptOpts {
   anonymize?: boolean;
   /** Prior verdicts for this ticker — analyst memory (citable as prior:<date>). */
   history?: PriorLook[];
+  /** The reader's standing objections from the debate channel — must be addressed. */
+  objections?: import("../lib/db.js").UserArgument[];
 }
 
 export function buildAnalystPrompt(bundle: TickerBundle, opts: PromptOpts = {}): PromptBundle {
@@ -150,6 +152,15 @@ ${computedDiff.map((l) => `  - ${l}`).join("\n")}\n` : ""}In changeSincePrior, e
 filing, a fired falsifier, a reclassification, a state change listed above — or state plainly
 that nothing material changed.\n`;
 
+  const objections = (opts.objections ?? []).filter((o) => !opts.anonymize);
+  const objectionsSection =
+    objections.length === 0
+      ? ""
+      : `\nREADER'S STANDING OBJECTIONS (your principal argued these in the debate channel — you
+MUST address each explicitly in dropCause.rationale or changeSincePrior; agreeing or refuting
+both require grounds from this bundle, never deference or stubbornness):
+${objections.map((o) => `  - [${o.createdAt}, then: ${o.standing}] "${o.userText.slice(0, 220)}" → must address: ${o.distilledNote}`).join("\n")}\n`;
+
   const prompt = `You are an equity research analyst. A stock dropped sharply and your job is to
 explain WHY it dropped — not whether to buy it. This feeds a research queue for a human; the
 valuable outputs are the drop-cause classification, genuine anomalies, and concrete falsifiers.
@@ -158,7 +169,7 @@ ${RULES}
 
 COMPANY: ${name} — SIC ${bundle.company.sicDescription}
 DROP CONTEXT: ${dropDesc}
-${rangesSection}${streetSection}${ecoSection}${no8k}${priorSection}
+${rangesSection}${streetSection}${ecoSection}${no8k}${priorSection}${objectionsSection}
 CITABLE SOURCES (the only valid citation values):
 ${[...validSources].map((s) => `  - ${s}`).join("\n")}
 

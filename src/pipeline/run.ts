@@ -160,7 +160,11 @@ async function main() {
       const { computeEconomicView } = await import("../compute/economics.js");
       bundle.drop!.economics = computeEconomicView(c.price, bundle.metrics, streetRev, street.epsGrowthPct);
 
-      const { record, cacheHit } = await analyzeWithCache(bundle);
+      // Standing reader objections from the debate channel must be addressed
+      // in every fresh analysis of this ticker (and bust the cache).
+      const { loadArguments } = await import("../lib/db.js");
+      const objections = await loadArguments(c.ticker).catch(() => []);
+      const { record, cacheHit } = await analyzeWithCache(bundle, { objections });
       if (cacheHit) cacheHits++;
 
       const seen = cooldown[c.ticker];

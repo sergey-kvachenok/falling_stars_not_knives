@@ -37,7 +37,7 @@ export const config = {
     maxCitationRetries: 2,
     maxOutputTokens: 8192,
     // Part of the bundle hash — bump on ANY prompt or schema change (PLAN.md §6.2).
-    promptVersion: 13,
+    promptVersion: 14,
   },
   valuation: {
     // "Best entry" per scenario = estimated price discounted so the scenario

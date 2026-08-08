@@ -29,14 +29,14 @@ export interface AnalysisRecord {
  * the bundle but NOT the hash — a recurring ticker with no new filing reuses
  * its cached analysis.
  */
-export function bundleHash(bundle: TickerBundle): string {
+export function bundleHash(bundle: TickerBundle, extra = ""): string {
   const accessions = [
     ...bundle.documents.recent8Ks.map((d) => d.accession),
     ...(bundle.documents.latestQuarterly ? [bundle.documents.latestQuarterly.accession] : []),
   ].sort();
   const factsFingerprint = createHash("sha256").update(JSON.stringify(bundle.facts)).digest("hex");
   return createHash("sha256")
-    .update([bundle.ticker, accessions.join(","), factsFingerprint, `v${config.llm.promptVersion}`].join("|"))
+    .update([bundle.ticker, accessions.join(","), factsFingerprint, `v${config.llm.promptVersion}`, extra].join("|"))
     .digest("hex")
     .slice(0, 24);
 }
@@ -86,7 +86,11 @@ export function majority(labels: string[]): { winner: string; agreement: number 
 /** Deep pass with citation validation and a hard retry cap (PLAN.md §7.5). */
 export async function deepAnalyze(
   bundle: TickerBundle,
-  opts: { anonymize?: boolean; history?: import("./history.js").PriorLook[] } = {},
+  opts: {
+    anonymize?: boolean;
+    history?: import("./history.js").PriorLook[];
+    objections?: import("../lib/db.js").UserArgument[];
+  } = {},
 ): Promise<{ verdict: Verdict | null; errors: string[] }> {
   const { prompt, validSources } = buildAnalystPrompt(bundle, opts);
   let p = prompt;
@@ -104,14 +108,14 @@ export async function deepAnalyze(
 
 export async function analyzeBundle(
   bundle: TickerBundle,
-  opts: { anonymize?: boolean } = {},
+  opts: { anonymize?: boolean; objections?: import("../lib/db.js").UserArgument[] } = {},
 ): Promise<AnalysisRecord> {
   // Classification votes stay memory-free: three INDEPENDENT reads of the
   // evidence measure ambiguity — anchoring them on a prior verdict would
   // corrupt the vote-agreement health metric. Memory enters the deep pass.
   const classification = await classifyWithVotes(bundle, opts);
   const history = opts.anonymize ? [] : (await import("./history.js")).getTickerHistory(bundle.ticker);
-  const { verdict, errors } = await deepAnalyze(bundle, { ...opts, history });
+  const { verdict, errors } = await deepAnalyze(bundle, { ...opts, history, objections: opts.objections });
   if (verdict && !verdict.insufficientEvidence) {
     // Median-of-three valuation numbers (compact re-samples; see valuation.ts).
     try {

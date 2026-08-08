@@ -39,6 +39,44 @@ export async function ensureRowTables(sql: Sql): Promise<void> {
     data jsonb NOT NULL,
     updated_at timestamptz NOT NULL DEFAULT now()
   )`;
+  await sql`CREATE TABLE IF NOT EXISTS user_arguments (
+    id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    ticker text NOT NULL,
+    user_text text NOT NULL,
+    ai_reply text NOT NULL,
+    standing text NOT NULL,
+    distilled_note text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`;
+}
+
+export interface UserArgument {
+  ticker: string;
+  userText: string;
+  standing: string; // concede_update | partial | hold
+  distilledNote: string; // what future analyses must address
+  createdAt: string;
+}
+
+/** The reader's standing objections — injected into every future analysis of the ticker. */
+export async function loadArguments(ticker: string, limit = 3): Promise<UserArgument[]> {
+  const sql = db();
+  if (!sql) return [];
+  try {
+    await ensureRowTables(sql);
+    const rows = await sql<{ ticker: string; user_text: string; standing: string; distilled_note: string; created_at: Date }[]>`
+      SELECT ticker, user_text, standing, distilled_note, created_at FROM user_arguments
+      WHERE ticker = ${ticker} ORDER BY created_at DESC LIMIT ${limit}`;
+    return rows.map((r) => ({
+      ticker: r.ticker,
+      userText: r.user_text,
+      standing: r.standing,
+      distilledNote: r.distilled_note,
+      createdAt: r.created_at.toISOString().slice(0, 10),
+    }));
+  } finally {
+    await sql.end();
+  }
 }
 
 /** Durable per-company 5-year performance record — audit + cross-company queries. */

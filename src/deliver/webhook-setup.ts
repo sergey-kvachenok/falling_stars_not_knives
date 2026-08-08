@@ -36,7 +36,8 @@ async function main() {
     await call("setWebhook", {
       url: arg,
       secret_token: secret,
-      allowed_updates: ["callback_query"],
+      // messages enable the debate channel (arguing with predictions in chat)
+      allowed_updates: ["callback_query", "message"],
       drop_pending_updates: false,
     });
     console.log(`Webhook set to ${arg}`);
