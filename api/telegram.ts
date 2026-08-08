@@ -60,6 +60,7 @@ export async function GET(request: Request): Promise<Response> {
     tokenSet: Boolean(process.env.TELEGRAM_BOT_TOKEN),
     dbSet: Boolean(process.env.DATABASE_URL),
     geminiSet: Boolean(process.env.GEMINI_API_KEY),
+    chatIdSet: Boolean(process.env.TELEGRAM_CHAT_ID), // required for the debate channel's owner check
     // Names only, never values — shows what the runtime actually receives.
     envNames: Object.keys(process.env)
       .filter((k) => /GEMINI|TELEGRAM|DATABASE/i.test(k))
