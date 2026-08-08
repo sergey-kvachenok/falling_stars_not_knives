@@ -60,6 +60,11 @@ export async function GET(request: Request): Promise<Response> {
     tokenSet: Boolean(process.env.TELEGRAM_BOT_TOKEN),
     dbSet: Boolean(process.env.DATABASE_URL),
     geminiSet: Boolean(process.env.GEMINI_API_KEY),
+    // Names only, never values — shows what the runtime actually receives.
+    envNames: Object.keys(process.env)
+      .filter((k) => /GEMINI|TELEGRAM|DATABASE/i.test(k))
+      .sort()
+      .map((k) => `${k}(len=${process.env[k]?.length ?? 0})`),
   };
   if (process.env.GEMINI_API_KEY) {
     try {
