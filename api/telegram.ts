@@ -145,18 +145,27 @@ async function processArgument(msg: TgMessage): Promise<void> {
       ticker text NOT NULL, user_text text NOT NULL, ai_reply text NOT NULL,
       standing text NOT NULL, distilled_note text NOT NULL,
       created_at timestamptz NOT NULL DEFAULT now())`;
-    // Which ticker? Match uppercase tokens against companies we actually know.
+    await sql`CREATE TABLE IF NOT EXISTS debate_context (
+      chat_id text PRIMARY KEY, ticker text NOT NULL,
+      updated_at timestamptz NOT NULL DEFAULT now())`;
+    // Which ticker? Explicit mention wins; otherwise continue the recent
+    // conversation (follow-ups like "and what is the corrected estimate?").
     const known = new Set(
       (await sql<{ ticker: string }[]>`SELECT ticker FROM performance UNION SELECT ticker FROM cards`).map(
         (r) => r.ticker,
       ),
     );
     const tokens = text.toUpperCase().match(/\$?\b[A-Z]{1,5}\b/g) ?? [];
-    const ticker = tokens.map((t) => t.replace("$", "")).find((t) => known.has(t));
+    let ticker = tokens.map((t) => t.replace("$", "")).find((t) => known.has(t));
+    if (!ticker) {
+      const [ctx] = await sql<{ ticker: string }[]>`
+        SELECT ticker FROM debate_context WHERE chat_id = ${String(chatId)} AND updated_at > now() - interval '6 hours'`;
+      ticker = ctx?.ticker;
+    }
     if (!ticker) {
       await tg("sendMessage", {
         chat_id: chatId,
-        text: `I couldn't match a ticker I've analyzed. Mention it explicitly (e.g. "RBLX: your bear case ignores…"). Known: ${[...known].sort().join(", ")}`,
+        text: `I couldn't match a ticker I've analyzed (and no recent conversation to continue). Mention it explicitly. Known: ${[...known].sort().join(", ")}`,
       });
       return;
     }
@@ -170,15 +179,23 @@ async function processArgument(msg: TgMessage): Promise<void> {
     }[];
     const pred = preds.filter((p) => p.ticker === ticker).sort((a, b) => a.runDate.localeCompare(b.runDate)).at(-1);
     const [perf] = await sql<{ data: unknown }[]>`SELECT data FROM performance WHERE ticker = ${ticker}`;
-    const priorArgs = await sql<{ user_text: string; distilled_note: string; created_at: Date }[]>`
-      SELECT user_text, distilled_note, created_at FROM user_arguments WHERE ticker = ${ticker} ORDER BY created_at DESC LIMIT 3`;
+    const priorArgs = await sql<{ user_text: string; ai_reply: string; distilled_note: string; created_at: Date }[]>`
+      SELECT user_text, ai_reply, distilled_note, created_at FROM user_arguments WHERE ticker = ${ticker} ORDER BY created_at DESC LIMIT 3`;
+    const lastExchange = priorArgs[0]
+      ? `\nMOST RECENT EXCHANGE (continue this conversation):\nReader: "${priorArgs[0].user_text.slice(0, 400)}"\nYou replied: "${priorArgs[0].ai_reply.slice(0, 600)}"`
+      : "";
 
     const prompt = `You are the research agent behind a disciplined valuation system. The reader — your
 principal — is arguing with your recorded analysis of ${ticker}. Engage as a colleague, not a
 defender. Rules: reason only from the RECORDED DATA below and the reader's argument; no price
 predictions; if the reader identifies a factual error or a consideration you missed, concede
 explicitly; if the recorded filed data contradicts them, say which number; always name the
-observable that would settle the disagreement.
+observable that would settle the disagreement. If the reader asks for a corrected estimate:
+give corrected ASSUMPTIONS (which multiple, grounded in what the data shows the market pays
+now) and, using ONLY numbers present in the context, an INDICATIVE per-share implication —
+always labeled indicative, with the note that the binding revaluation runs in the next
+nightly analysis, which this conversation has already forced. Never present chat arithmetic
+as an official fair value.
 
 RECORDED ANALYSIS (${pred?.runDate ?? "unknown"}): ${JSON.stringify({
       classification: pred?.classification,
@@ -189,9 +206,9 @@ RECORDED ANALYSIS (${pred?.runDate ?? "unknown"}): ${JSON.stringify({
       killSwitches: pred?.scenarios?.map((s) => `${s.horizonYears}y ${s.scenarioCase}: ${s.falsifier}`),
     })}
 PERFORMANCE RECORD: ${JSON.stringify(perf?.data ?? null)}
-PRIOR READER OBJECTIONS: ${priorArgs.map((a) => `[${a.created_at.toISOString().slice(0, 10)}] ${a.user_text} → noted: ${a.distilled_note}`).join(" | ") || "none"}
+PRIOR READER OBJECTIONS: ${priorArgs.map((a) => `[${a.created_at.toISOString().slice(0, 10)}] ${a.user_text.slice(0, 200)} → noted: ${a.distilled_note}`).join(" | ") || "none"}${lastExchange}
 
-READER'S ARGUMENT: "${text.slice(0, 1500)}"`;
+READER'S MESSAGE: "${text.slice(0, 1500)}"`;
 
     const schema = {
       type: "OBJECT",
@@ -236,6 +253,8 @@ READER'S ARGUMENT: "${text.slice(0, 1500)}"`;
     });
     await sql`INSERT INTO user_arguments (ticker, user_text, ai_reply, standing, distilled_note)
               VALUES (${ticker}, ${text.slice(0, 2000)}, ${out.reply.slice(0, 3000)}, ${out.standing}, ${out.distilledNote.slice(0, 500)})`;
+    await sql`INSERT INTO debate_context (chat_id, ticker, updated_at) VALUES (${String(chatId)}, ${ticker}, now())
+              ON CONFLICT (chat_id) DO UPDATE SET ticker = EXCLUDED.ticker, updated_at = now()`;
   } finally {
     await sql.end();
   }
