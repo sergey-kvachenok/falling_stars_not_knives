@@ -77,6 +77,13 @@ export function buildExpandedCard(e: DigestEntry): CardRow {
 
     // 🔍 Analysis — the analytical content as its own distinct section.
     parts.push(`\n🔍 <b>Analysis</b>`, esc(cut(v.oneLineThesis, 200)));
+    const fy = m.fiveYear;
+    if (fy) {
+      parts.push(
+        `${fy.spanYears}y record: rev CAGR ${fy.revenueCagrPct ?? "?"}% · gross margin ${bp(fy.grossMarginDeltaBp)} · ` +
+          `FCF+ ${fy.fcfPositiveQuarters}/${fy.fcfQuarters}q · shares ${fy.shareCagrPct != null ? (fy.shareCagrPct > 0 ? "+" : "") + fy.shareCagrPct : "?"}%/yr`,
+      );
+    }
     if (v.changeSincePrior && !/^first look/i.test(v.changeSincePrior)) {
       parts.push(`Δ since last look: ${esc(cut(v.changeSincePrior, 220))}`);
     }
@@ -101,6 +108,8 @@ export function buildExpandedCard(e: DigestEntry): CardRow {
     html: cut(parts.join("\n"), 3800),
   };
 }
+
+const bp = (x: number | null): string => (x === null ? "?" : `${x > 0 ? "+" : ""}${x}bp`);
 
 export function pctVs(price: number, anchor: number): string {
   const d = (price / anchor - 1) * 100;

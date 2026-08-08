@@ -58,7 +58,19 @@ export interface ComputedMetrics {
     inventoryQoqPct: number | null;
     revenueQoqPct: number | null; // repeated here for the divergence read
   };
+  /** Through-cycle record — durability evidence TTM data cannot show. */
+  fiveYear: FiveYearPerformance | null;
   provenance: Record<string, { tag: string | null; latestAccn: string | null }>;
+}
+
+export interface FiveYearPerformance {
+  spanYears: number;
+  revenueCagrPct: number | null;
+  grossMarginDeltaBp: number | null; // first-year avg → last-year avg
+  opMarginDeltaBp: number | null;
+  fcfPositiveQuarters: number; // owner FCF (after SBC)
+  fcfQuarters: number;
+  shareCagrPct: number | null; // serial-diluter detector
 }
 
 interface TrendValue {
@@ -196,7 +208,65 @@ export function computeMetrics(series: FactsByConcept): ComputedMetrics {
       inventoryQoqPct: invQoq,
       revenueQoqPct: revQoq,
     },
+    fiveYear: fiveYearSummary(rev, grossByEnd, opInc, fcf, sharesPts, weightedShares),
     provenance,
+  };
+}
+
+/** Through-cycle summary; null when history spans under 3 years. */
+export function fiveYearSummary(
+  rev: QuarterPoint[],
+  gross: QuarterPoint[],
+  opInc: QuarterPoint[],
+  fcf: QuarterPoint[],
+  sharesPts: { end: string; val: number }[],
+  weightedShares: QuarterPoint[],
+): FiveYearPerformance | null {
+  if (rev.length < 12) return null;
+  const spanYears = (Date.parse(rev[rev.length - 1]!.end) - Date.parse(rev[0]!.end)) / (365.25 * 86_400_000);
+  if (spanYears < 3) return null;
+
+  const sum4 = (pts: QuarterPoint[], fromStart: boolean): number =>
+    (fromStart ? pts.slice(0, 4) : pts.slice(-4)).reduce((s, p) => s + p.val, 0);
+  const firstRev = sum4(rev, true);
+  const lastRev = sum4(rev, false);
+  // CAGR measured between the two four-quarter windows: their midpoints sit
+  // 3 quarters (0.75y) closer together than the raw first-to-last span.
+  const cagrYears = spanYears - 0.75;
+  const revenueCagrPct =
+    firstRev > 0 && cagrYears > 0 ? round1((Math.pow(lastRev / firstRev, 1 / cagrYears) - 1) * 100) : null;
+
+  const marginDelta = (numer: QuarterPoint[]): number | null => {
+    const nByEnd = new Map(numer.map((p) => [p.end, p]));
+    const window = (pts: QuarterPoint[]) => {
+      const pairs = pts.filter((p) => nByEnd.has(p.end) && p.val !== 0);
+      if (pairs.length === 0) return null;
+      const n = pairs.reduce((s, p) => s + nByEnd.get(p.end)!.val, 0);
+      const d = pairs.reduce((s, p) => s + p.val, 0);
+      return d !== 0 ? n / d : null;
+    };
+    const first = window(rev.slice(0, 4));
+    const last = window(rev.slice(-4));
+    return first !== null && last !== null ? Math.round((last - first) * 10000) : null;
+  };
+
+  const shares = sharesPts.length >= 2 ? sharesPts : weightedShares.map((q) => ({ end: q.end, val: q.val }));
+  let shareCagrPct: number | null = null;
+  if (shares.length >= 2) {
+    const s0 = shares[0]!;
+    const s1 = shares[shares.length - 1]!;
+    const yrs = (Date.parse(s1.end) - Date.parse(s0.end)) / (365.25 * 86_400_000);
+    if (yrs >= 3 && s0.val > 0) shareCagrPct = round1((Math.pow(s1.val / s0.val, 1 / yrs) - 1) * 100);
+  }
+
+  return {
+    spanYears: round1(spanYears),
+    revenueCagrPct,
+    grossMarginDeltaBp: marginDelta(gross),
+    opMarginDeltaBp: marginDelta(opInc),
+    fcfPositiveQuarters: fcf.filter((p) => p.val > 0).length,
+    fcfQuarters: fcf.length,
+    shareCagrPct,
   };
 }
 

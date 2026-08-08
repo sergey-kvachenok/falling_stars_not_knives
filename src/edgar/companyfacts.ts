@@ -54,7 +54,9 @@ interface RawCompanyFacts {
   facts: Record<string, Record<string, { units: Record<string, RawFact[]> }>>;
 }
 
-const KEEP_QUARTERS = 10;
+// ~5 years + one for YoY math: long enough for through-cycle performance
+// (CAGR, margin trajectory, FCF consistency) and full-cycle multiple bands.
+const KEEP_QUARTERS = 21;
 
 export async function getCompanyFacts(cik: number): Promise<{ entityName: string; series: FactsByConcept }> {
   const id = cik10(cik);
@@ -100,7 +102,7 @@ export function extractConcept(raw: RawCompanyFacts, def: ConceptDef): ConceptSe
     concept: def.name,
     tag: best.tag,
     quarterly: quarterly.slice(-KEEP_QUARTERS),
-    annual: annual.slice(-4),
+    annual: annual.slice(-6),
     instant: [],
   };
 }

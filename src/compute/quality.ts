@@ -118,6 +118,20 @@ export function digestGate(bundle: TickerBundle, verdict: Verdict | null): GateR
     );
   }
 
+  // Through-cycle durability (5-year record): one good TTM year is not a
+  // business; serial dilution and intermittent cash generation are.
+  const fy = m.fiveYear;
+  if (fy) {
+    if (fy.shareCagrPct !== null && fy.shareCagrPct > config.quality.maxShareCagr5yPct) {
+      reasons.push(`serial diluter: share count growing ${fy.shareCagrPct}%/yr over ${fy.spanYears}y`);
+    }
+    if (fy.fcfQuarters >= 8 && fy.fcfPositiveQuarters / fy.fcfQuarters < config.quality.minFcfPositiveShare) {
+      reasons.push(
+        `inconsistent cash generation: owner FCF positive in only ${fy.fcfPositiveQuarters}/${fy.fcfQuarters} quarters`,
+      );
+    }
+  }
+
   // Degraded metrics can't certify health.
   if (bundle.sanity.confidence === "degraded") reasons.push("metrics confidence degraded");
 

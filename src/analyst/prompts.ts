@@ -35,8 +35,11 @@ const RULES = `RULES — read carefully:
   or P/S); negative EBITDA → never EV/EBITDA. metric "none" is only allowed with
   insufficient_evidence.
 - Moat: judge the durability of the business from economics visible in the bundle — margin
-  levels and stability, pricing power, switching costs implied by the filings. Be stingy:
-  "wide" is rare; when the bundle gives no basis, say "unclear", never guess upward.
+  levels and stability, pricing power, switching costs implied by the filings. The metrics
+  include a fiveYear block (revenue CAGR, margin trajectory in bp, owner-FCF consistency,
+  share-count CAGR): a real moat shows up there as stable-or-expanding margins and
+  consistent cash through the cycle — engage it explicitly. Be stingy: "wide" is rare;
+  when the bundle gives no basis, say "unclear", never guess upward.
 - When HISTORICAL MULTIPLE RANGES are provided, choose multiples INSIDE them: bear near or
   below p25, base near p50, bull near p75. Going outside the range requires the rationale to
   say why the market's own history no longer applies.

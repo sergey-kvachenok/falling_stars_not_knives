@@ -37,7 +37,7 @@ export const config = {
     maxCitationRetries: 2,
     maxOutputTokens: 8192,
     // Part of the bundle hash — bump on ANY prompt or schema change (PLAN.md §6.2).
-    promptVersion: 12,
+    promptVersion: 13,
   },
   valuation: {
     // "Best entry" per scenario = estimated price discounted so the scenario
@@ -81,6 +81,9 @@ export const config = {
     // compounders — an owner-FCF margin this high proves value creation
     // regardless of what the GAAP ROIC formula says.
     roicBypassFcfMarginPct: 15,
+    // Through-cycle gates (5-year record):
+    maxShareCagr5yPct: 8, // serial diluters transfer the upside to themselves
+    minFcfPositiveShare: 0.5, // owner FCF must be positive in ≥ half the recorded quarters
   },
   news: {
     maxCompaniesPerDay: 5,

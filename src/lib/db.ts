@@ -34,6 +34,28 @@ export async function ensureRowTables(sql: Sql): Promise<void> {
     html text NOT NULL,
     updated_at timestamptz NOT NULL DEFAULT now()
   )`;
+  await sql`CREATE TABLE IF NOT EXISTS performance (
+    ticker text PRIMARY KEY,
+    data jsonb NOT NULL,
+    updated_at timestamptz NOT NULL DEFAULT now()
+  )`;
+}
+
+/** Durable per-company 5-year performance record — audit + cross-company queries. */
+export async function upsertPerformance(rows: { ticker: string; data: unknown }[]): Promise<boolean> {
+  const sql = db();
+  if (!sql || rows.length === 0) return false;
+  try {
+    await ensureRowTables(sql);
+    for (const r of rows) {
+      await sql`INSERT INTO performance (ticker, data, updated_at)
+                VALUES (${r.ticker}, ${sql.json(r.data as never)}, now())
+                ON CONFLICT (ticker) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`;
+    }
+    return true;
+  } finally {
+    await sql.end();
+  }
 }
 
 export async function insertFeedbackDb(entries: FeedbackEntry[]): Promise<void> {

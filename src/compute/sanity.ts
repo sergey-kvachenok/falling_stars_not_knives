@@ -47,7 +47,9 @@ export function sanityCheck(series: FactsByConcept, metrics: ComputedMetrics): S
 
   // 3. Series continuity: a huge QoQ revenue jump is more often a phantom
   //    discontinuity (tag switch, period misalignment) than a finding.
-  const rev = series.revenue?.quarterly ?? [];
+  //    Only the recent window matters — ancient tag switches shouldn't
+  //    degrade a company whose current data is clean.
+  const rev = (series.revenue?.quarterly ?? []).slice(-8);
   for (let i = 1; i < rev.length; i++) {
     const prev = rev[i - 1]!;
     const cur = rev[i]!;

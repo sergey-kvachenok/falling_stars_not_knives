@@ -187,6 +187,21 @@ async function main() {
   }
   if (skipped.length > 0) console.log(`Skipped: ${skipped.join("; ")}`);
 
+  // Durable 5-year performance records for every analyzed company.
+  const { upsertPerformance } = await import("../lib/db.js");
+  await upsertPerformance(
+    entries.map((e) => ({
+      ticker: e.candidate.ticker,
+      data: {
+        asOfQuarter: e.bundle.metrics.asOfQuarter,
+        capturedAt: runDate,
+        fiveYear: e.bundle.metrics.fiveYear,
+        ttm: e.bundle.metrics.ttm,
+        economics: e.bundle.drop?.economics ?? null,
+      },
+    })),
+  ).catch((err) => console.warn(`performance upsert failed: ${(err as Error).message}`));
+
   // Health metrics (PLAN.md §11).
   const withVerdicts = entries.filter((e) => e.analysis.verdict);
   const insuffRate = withVerdicts.length
