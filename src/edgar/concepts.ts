@@ -129,6 +129,15 @@ export const CONCEPTS: ConceptDef[] = [
     tags: ["LongTermDebtCurrent", "DebtCurrent", "ShortTermBorrowings"],
   },
   { name: "inventory", taxonomy: "us-gaap", unit: "USD", kind: "instant", tags: ["InventoryNet"] },
+  {
+    // Floor for invested capital in ROIC: net-cash companies otherwise get a
+    // tiny or negative denominator and a meaningless ratio.
+    name: "ppe",
+    taxonomy: "us-gaap",
+    unit: "USD",
+    kind: "instant",
+    tags: ["PropertyPlantAndEquipmentNet", "PropertyPlantAndEquipmentAndFinanceLeaseRightOfUseAssetAfterAccumulatedDepreciationAndAmortization"],
+  },
   { name: "assets", taxonomy: "us-gaap", unit: "USD", kind: "instant", tags: ["Assets"] },
   { name: "liabilities", taxonomy: "us-gaap", unit: "USD", kind: "instant", tags: ["Liabilities"] },
   {

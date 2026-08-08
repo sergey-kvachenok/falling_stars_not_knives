@@ -53,12 +53,18 @@ low-leverage mega-caps (>$100B), and **+2pts per risk marker** (netDebt/EBITDA >
 FCF margin < 5%, market cap < $5B), capped at 16% — a cash-burning leveraged micro-cap is
 all three risks at once. The rate used is shown with every economic view.
 
-**EPV — earnings power value (Greenwald).** The value if the business never grows:
+**EPV — earnings power value (Greenwald).** The value if the business never grows, on
+**normalized earnings** — `min(TTM, 5-year average)` — so a cyclical at its peak cannot
+inflate its own floor with windfall earnings (a floor never stands on a peak):
 
 ```
-EPV_equity  = EBIT_TTM × (1 − tax) / r − netDebt          (fallback: FCF_TTM / r)
+EPV_equity  = min(EBIT_TTM, EBIT_5yAvg) × (1 − tax) / r − netDebt   (fallback: normalized FCF / r)
 EPV/share   = EPV_equity / shares
 ```
+
+The reverse DCF uses the same normalized FCF base, and ROIC's invested capital is floored
+at PP&E — net-cash companies otherwise get a tiny/negative denominator and a meaningless
+ratio (Equity + Debt − Cash can go negative when cash exceeds both).
 
 **Reverse DCF — market-implied growth (Rappaport).** Take today's market cap as given and
 solve (bisection) for the growth rate g that prices it:
@@ -158,10 +164,16 @@ Three stability guards on the loop itself:
 - **Fast regime guard**: 1-year price calibration lags a market regime by design;
   kill-switches don't. When >30% of graded kill-switches fired (≥10 graded), the required
   discount widens by 5pts immediately.
-- **Corporate actions enter the sample explicitly**: buyouts resolve at the offer price,
-  bankruptcies at $0, via `npm run resolve -- TICKER DATE PRICE` — silently dropping dead
-  tickers would delete every −100% and flatter the system. The Sunday rollup nags about
-  unresolved names.
+- **Corporate actions enter the sample, automatically where possible**: when a ticker's
+  price history vanishes, the scorer checks EDGAR — an 8-K Item 1.03
+  (bankruptcy/receivership) auto-resolves at $0; a Form 25 delisting flags the name for a
+  manual deal price (`npm run resolve -- TICKER DATE PRICE`). Silently dropping dead
+  tickers would delete every −100% and flatter the system; the rollup nags until every
+  name is resolved.
+- **Calibration is market-adjusted**: realized prices are deflated by SPY's return over
+  the same window before comparison with fair value — otherwise a bear market reads as
+  "our fair values ran hot" and a bull market hides real errors, making the loop react to
+  liquidity cycles instead of valuation accuracy.
 
 `npm run verify` prints the full ledger — every prediction, what was claimed, on what
 economics, and what actually happened — plus the current calibration status.

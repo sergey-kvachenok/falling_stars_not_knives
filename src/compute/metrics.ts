@@ -40,11 +40,15 @@ export interface ComputedMetrics {
     ebit: number | null;
     netIncome: number | null;
     fcf: number | null;
+    /** Annualized multi-year averages — cyclical normalization inputs. */
+    ebitAvg5y: number | null;
+    fcfAvg5y: number | null;
   };
   balance: {
     cashAndSti: MetricValue | null;
     totalDebt: MetricValue | null;
     equityBook: MetricValue | null;
+    ppe: MetricValue | null;
     netDebt: number | null;
     netDebtToEbitdaTtm: number | null;
     interestCoverageTtm: number | null; // EBIT(ttm) / interest expense(ttm)
@@ -185,6 +189,8 @@ export function computeMetrics(series: FactsByConcept): ComputedMetrics {
       ebit: ebitTtm,
       netIncome: ttm(netInc),
       fcf: ttm(fcf),
+      ebitAvg5y: avgAnnualized(opInc),
+      fcfAvg5y: avgAnnualized(fcf),
     },
     balance: {
       cashAndSti,
@@ -192,6 +198,10 @@ export function computeMetrics(series: FactsByConcept): ComputedMetrics {
       equityBook: (() => {
         const eq = lastInstant(series.equity?.instant ?? []);
         return eq ? { value: eq.val, accn: eq.accn } : null;
+      })(),
+      ppe: (() => {
+        const p = lastInstant(series.ppe?.instant ?? []);
+        return p ? { value: p.val, accn: p.accn } : null;
       })(),
       netDebt,
       netDebtToEbitdaTtm:
@@ -332,6 +342,12 @@ function marginTrend(numer: QuarterPoint[], denom: QuarterPoint[]): TrendValue |
 function ttm(pts: QuarterPoint[]): number | null {
   if (pts.length < 4) return null;
   return pts.slice(-4).reduce((sum, p) => sum + p.val, 0);
+}
+
+/** Mean quarterly value × 4 over available history (needs ≥12 quarters). */
+function avgAnnualized(pts: QuarterPoint[]): number | null {
+  if (pts.length < 12) return null;
+  return (pts.reduce((s, p) => s + p.val, 0) / pts.length) * 4;
 }
 
 function alignedInstant(

@@ -41,7 +41,9 @@ export interface Prediction {
   promptVersion?: number;
   /** Fair value after calibration adjustment, when the correction was active. */
   fairValue1yAdjusted?: number | null;
-  /** Realized-vs-fair error at 1y, percent; filled by the scoring job. */
+  /** SPY return over the same 1y window — calibration is market-adjusted. */
+  spyReturn1y?: number | null;
+  /** MARKET-ADJUSTED realized-vs-fair error at 1y, percent; filled by scoring. */
   valuationErrorPct?: number | null;
   // Filled in by the scoring job as the prediction ages:
   drift30?: number | null; // return vs SPY, fraction

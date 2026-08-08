@@ -24,7 +24,12 @@ async function main() {
   }
   p.return1y = p.refPrice > 0 ? Math.round((realized / p.refPrice - 1) * 10000) / 10000 : null;
   if (p.fairValue1y && p.fairValue1y > 0) {
-    p.valuationErrorPct = Math.round(((realized - p.fairValue1y) / p.fairValue1y) * 1000) / 10;
+    // Market-adjusted, same as automated grading.
+    const { returnSince } = await import("../screen/quotes.js");
+    const spy = await returnSince("SPY", p.runDate);
+    p.spyReturn1y = spy;
+    const realizedAdj = realized / (1 + (spy ?? 0));
+    p.valuationErrorPct = Math.round(((realizedAdj - p.fairValue1y) / p.fairValue1y) * 1000) / 10;
   }
   p.resolutionNote = noteParts.join(" ") || `manually resolved at $${realized}`;
   p.updatedAt = new Date().toISOString();

@@ -49,9 +49,24 @@ async function main() {
     if (needsDrift) {
       const [stock, spy] = await Promise.all([returnSince(p.ticker, p.runDate), returnSince("SPY", p.runDate)]);
       if (stock === null) {
-        // Delisted or unavailable (trap #7) — resolve, never leave silent.
-        p.resolutionNote = p.resolutionNote ?? "price history unavailable (delisted/acquired?) — resolve manually";
-        lines.push(`${p.ticker} (${p.runDate}): price history gone — needs manual resolution`);
+        // Delisted or unavailable (trap #7) — never silent: check EDGAR for
+        // the reason before falling back to a manual nag. Chapter 11 (8-K
+        // Item 1.03) auto-resolves at $0 — dropping bankruptcies from the
+        // sample would delete the worst failures and flatter calibration.
+        const auto = await detectCorporateAction(p.ticker, p.runDate).catch(() => null);
+        if (auto === "bankruptcy") {
+          p.return1y = -1;
+          p.spyReturn1y = spy;
+          if (p.fairValue1y) p.valuationErrorPct = -100;
+          p.resolutionNote = "auto: 8-K Item 1.03 bankruptcy/receivership — realized $0";
+          lines.push(`${p.ticker} (${p.runDate}): AUTO-RESOLVED at $0 (bankruptcy filing found)`);
+        } else if (auto === "delisted") {
+          p.resolutionNote = p.resolutionNote ?? "Form 25 delisting found (likely acquisition) — resolve price manually";
+          lines.push(`${p.ticker} (${p.runDate}): Form 25 delisting — resolve the deal price manually`);
+        } else {
+          p.resolutionNote = p.resolutionNote ?? "price history unavailable (delisted/acquired?) — resolve manually";
+          lines.push(`${p.ticker} (${p.runDate}): price history gone — needs manual resolution`);
+        }
       } else if (spy !== null) {
         const drift = stock - spy;
         if (ageDays >= 30 && p.drift30 === undefined) p.drift30 = round4(drift);
@@ -81,10 +96,15 @@ async function main() {
 
     if (ageDays >= 365 && p.return1y === undefined) {
       p.return1y = round4((await returnSince(p.ticker, p.runDate)) ?? NaN) || null;
-      // Calibration (#4): realized price vs the fair value claimed a year ago.
+      // Calibration is MARKET-ADJUSTED: in a −20% bear year a pick that fell
+      // 2% is a success, not a "fair value ran hot" data point. Nominal
+      // errors would make the loop react to liquidity cycles, not to our
+      // valuation accuracy.
       if (p.return1y !== null && p.fairValue1y) {
-        const realized = p.refPrice * (1 + p.return1y);
-        p.valuationErrorPct = round4(((realized - p.fairValue1y) / p.fairValue1y) * 100);
+        const spy = await returnSince("SPY", p.runDate);
+        p.spyReturn1y = spy !== null ? round4(spy) : null;
+        const realizedAdj = (p.refPrice * (1 + p.return1y)) / (1 + (spy ?? 0));
+        p.valuationErrorPct = round4(((realizedAdj - p.fairValue1y) / p.fairValue1y) * 100);
       }
       touched = true;
     }
@@ -202,6 +222,20 @@ async function main() {
   console.log(summary.replace(/<[^>]+>/g, ""));
   if (!noTelegram && telegramConfigured()) await sendHeartbeat(summary);
   await pushState();
+}
+
+/** EDGAR-based corporate-action detection for vanished tickers. */
+async function detectCorporateAction(ticker: string, sinceDate: string): Promise<"bankruptcy" | "delisted" | null> {
+  const { getUniverse } = await import("../screen/universe.js");
+  const { getSubmissions } = await import("../edgar/submissions.js");
+  const universe = await getUniverse();
+  const cik = universe.find((u) => u.ticker === ticker)?.cik;
+  if (!cik) return null; // gone from the ticker map entirely — manual
+  const profile = await getSubmissions(cik);
+  const recent = profile.filings.filter((f) => f.filedAt >= sinceDate);
+  if (recent.some((f) => f.form === "8-K" && f.items.includes("1.03"))) return "bankruptcy";
+  if (recent.some((f) => f.form === "25" || f.form === "25-NSE")) return "delisted";
+  return null;
 }
 
 const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;

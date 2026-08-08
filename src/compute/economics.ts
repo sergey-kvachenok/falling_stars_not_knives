@@ -71,23 +71,33 @@ export function computeEconomicView(
   // Bundles serialized before the ttm field existed deserialize without it.
   const t = m.ttm ?? { revenue: null, ebitda: null, ebit: null, netIncome: null, fcf: null };
 
-  // EPV floor.
+  // Cyclical normalization: TTM earnings at a cycle peak inflate the EPV
+  // floor and fake an expectations gap right before the trough. Using
+  // min(TTM, 5y average) is universally conservative — a floor should never
+  // stand on windfall earnings. (No sector classification to get wrong.)
+  const normEbit =
+    t.ebit !== null ? (t.ebitAvg5y !== null && t.ebitAvg5y !== undefined ? Math.min(t.ebit, t.ebitAvg5y) : t.ebit) : null;
+  const normFcf =
+    t.fcf !== null ? (t.fcfAvg5y !== null && t.fcfAvg5y !== undefined ? Math.min(t.fcf, t.fcfAvg5y) : t.fcf) : null;
+
+  // EPV floor on normalized earnings.
   let epvPerShare: number | null = null;
   if (shares && shares > 0) {
-    if (t.ebit !== null && t.ebit > 0) {
-      const equityValue = (t.ebit * (1 - taxRate)) / discountRate - netDebt;
+    if (normEbit !== null && normEbit > 0) {
+      const equityValue = (normEbit * (1 - taxRate)) / discountRate - netDebt;
       epvPerShare = equityValue > 0 ? round2(equityValue / shares) : null;
-    } else if (t.fcf !== null && t.fcf > 0) {
+    } else if (normFcf !== null && normFcf > 0) {
       // FCF is an equity flow (CFO is post-interest) — no net-debt adjustment.
-      epvPerShare = round2(t.fcf / discountRate / shares);
+      epvPerShare = round2(normFcf / discountRate / shares);
     }
   }
 
-  // Reverse DCF on TTM FCF.
+  // Reverse DCF on normalized FCF — peak cash flow would understate what the
+  // price implies, flattering the gap.
   let impliedGrowthPct: number | null = null;
-  if (price && price > 0 && shares && shares > 0 && t.fcf !== null && t.fcf > 0) {
+  if (price && price > 0 && shares && shares > 0 && normFcf !== null && normFcf > 0) {
     const marketCap = price * shares;
-    const g = solveImpliedGrowth(t.fcf, marketCap, discountRate, terminalGrowth, fadeYears);
+    const g = solveImpliedGrowth(normFcf, marketCap, discountRate, terminalGrowth, fadeYears);
     impliedGrowthPct = g === null ? null : round1(g * 100);
   }
 
@@ -115,13 +125,17 @@ export function computeEconomicView(
   }
 
   // ROIC vs cost of capital: growth funded below its cost destroys value.
+  // Invested capital is floored at tangible operating assets (PP&E): for
+  // net-cash companies, Equity+Debt−Cash goes tiny or negative and the raw
+  // ratio turns meaningless — the excess cash isn't what runs the business.
   let roicPct: number | null = null;
   const equity = m.balance?.equityBook?.value ?? null;
   const debt = m.balance?.totalDebt?.value ?? null;
   const cash = m.balance?.cashAndSti?.value ?? null;
-  if (t.ebit !== null && equity !== null && debt !== null) {
-    const invested = equity + debt - (cash ?? 0);
-    if (invested > 0) roicPct = round1(((t.ebit * (1 - taxRate)) / invested) * 100);
+  const ppe = m.balance?.ppe?.value ?? null;
+  if (normEbit !== null && equity !== null && debt !== null) {
+    const invested = Math.max(equity + debt - (cash ?? 0), ppe ?? 0);
+    if (invested > 0) roicPct = round1(((normEbit * (1 - taxRate)) / invested) * 100);
   }
 
   return {

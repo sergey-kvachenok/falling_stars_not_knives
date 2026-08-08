@@ -79,6 +79,25 @@ test("risk tiers move the discount rate, and markers stack", () => {
   assert.equal(computeEconomicView(20, risky, null).discountRatePctUsed, 14);
 });
 
+test("cyclical peak: EPV and implied growth use min(TTM, 5y average)", () => {
+  const m = metrics();
+  // Peak year: TTM EBIT 2B, but 5y average only 1B → EPV must use 1B.
+  (m.ttm as Record<string, number | null>).ebitAvg5y = 1_000_000_000;
+  (m.ttm as Record<string, number | null>).fcfAvg5y = 500_000_000; // TTM fcf 1B
+  const v = computeEconomicView(50, m, null);
+  // 1B × 0.79 / 0.10 = 7.9B − 1B debt = 6.9B / 100M = $69 (was $148 on TTM)
+  assert.equal(v.epvPerShare, 69);
+});
+
+test("net-cash company: invested capital floored at PP&E, ROIC stays meaningful", () => {
+  const m = metrics({ equity: 10_000_000_000, debt: 0 });
+  (m.balance as Record<string, unknown>).cashAndSti = { value: 12_000_000_000, accn: "a" }; // cash > E+D
+  (m.balance as Record<string, unknown>).ppe = { value: 4_000_000_000, accn: "a" };
+  const v = computeEconomicView(50, m, null);
+  // invested = max(10+0−12, 4) = 4B → ROIC = 1.58B/4B = 39.5%, not negative
+  assert.equal(v.roicPct, 39.5);
+});
+
 test("no positive FCF → implied growth incomputable; EPV falls back through EBIT", () => {
   const v = computeEconomicView(50, metrics({ fcf: -100_000_000 }), null);
   assert.equal(v.impliedGrowthPct, null);
