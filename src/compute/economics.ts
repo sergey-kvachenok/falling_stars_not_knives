@@ -33,32 +33,34 @@ export function computeEconomicView(
   streetRevenue1yUsd: number | null,
 ): EconomicView {
   const { discountRate, terminalGrowth, taxRate, fadeYears } = config.economics;
-  const shares = m.dilution.sharesOutstanding?.value ?? null;
-  const netDebt = m.balance.netDebt ?? 0;
+  const shares = m.dilution?.sharesOutstanding?.value ?? null;
+  const netDebt = m.balance?.netDebt ?? 0;
+  // Bundles serialized before the ttm field existed deserialize without it.
+  const t = m.ttm ?? { revenue: null, ebitda: null, ebit: null, netIncome: null, fcf: null };
 
   // EPV floor.
   let epvPerShare: number | null = null;
   if (shares && shares > 0) {
-    if (m.ttm.ebit !== null && m.ttm.ebit > 0) {
-      const equityValue = (m.ttm.ebit * (1 - taxRate)) / discountRate - netDebt;
+    if (t.ebit !== null && t.ebit > 0) {
+      const equityValue = (t.ebit * (1 - taxRate)) / discountRate - netDebt;
       epvPerShare = equityValue > 0 ? round2(equityValue / shares) : null;
-    } else if (m.ttm.fcf !== null && m.ttm.fcf > 0) {
+    } else if (t.fcf !== null && t.fcf > 0) {
       // FCF is an equity flow (CFO is post-interest) — no net-debt adjustment.
-      epvPerShare = round2(m.ttm.fcf / discountRate / shares);
+      epvPerShare = round2(t.fcf / discountRate / shares);
     }
   }
 
   // Reverse DCF on TTM FCF.
   let impliedGrowthPct: number | null = null;
-  if (price && price > 0 && shares && shares > 0 && m.ttm.fcf !== null && m.ttm.fcf > 0) {
+  if (price && price > 0 && shares && shares > 0 && t.fcf !== null && t.fcf > 0) {
     const marketCap = price * shares;
-    const g = solveImpliedGrowth(m.ttm.fcf, marketCap, discountRate, terminalGrowth, fadeYears);
+    const g = solveImpliedGrowth(t.fcf, marketCap, discountRate, terminalGrowth, fadeYears);
     impliedGrowthPct = g === null ? null : round1(g * 100);
   }
 
   const streetGrowthPct =
-    streetRevenue1yUsd && m.ttm.revenue && m.ttm.revenue > 0
-      ? round1((streetRevenue1yUsd / m.ttm.revenue - 1) * 100)
+    streetRevenue1yUsd && t.revenue && t.revenue > 0
+      ? round1((streetRevenue1yUsd / t.revenue - 1) * 100)
       : null;
 
   return {
